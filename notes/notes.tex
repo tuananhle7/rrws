@@ -1,0 +1,79 @@
+\documentclass[a4paper]{article}
+
+% Accented characters output/input http://tex.stackexchange.com/questions/44694/fontenc-vs-inputenc
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+
+% Nicer fonts http://tex.stackexchange.com/questions/147194/is-it-still-useful-to-load-the-lmodern-package
+\usepackage{lmodern}
+
+% mathtools loads amsmath http://tex.stackexchange.com/questions/43860/mathtools-vs-amsmath
+\usepackage{mathtools}
+
+% different font
+\usepackage{palatino}
+
+\usepackage{amssymb}
+\usepackage{amsthm}
+\usepackage{hyperref}
+
+\usepackage{graphicx}
+\usepackage{subcaption}
+\usepackage{animate}
+\usepackage{booktabs}
+\usepackage{tabulary}
+\usepackage{rotating}
+\usepackage[margin=2cm]{geometry}
+\usepackage{listings}
+
+% Todo
+\usepackage{todonotes}
+
+% Citations
+\usepackage[round]{natbib}
+\bibliographystyle{unsrtnat}
+
+% Algorithm stuff
+\usepackage[ruled,vlined]{algorithm2e}
+
+% Math stuff
+\newcommand{\given}{\lvert}
+\renewcommand{\vec}[1]{\boldsymbol{\mathbf{#1}}}
+\newcommand{\KL}[2]{\acrshort{KL}\left(#1 \mid\mid #2\right)}
+\DeclareMathOperator*{\argmin}{arg\,min}
+\DeclareMathOperator*{\argmax}{arg\,max}
+\DeclareMathOperator*{\maximize}{maximize}
+\DeclareMathOperator*{\minimize}{minimize}
+\DeclareMathOperator{\ELBO}{\acrshort{ELBO}}
+
+% abbreviations
+\usepackage[acronym,smallcaps,nowarn,section,nogroupskip,nonumberlist]{glossaries}
+\glsdisablehyper{}
+\newacronym{VAE}{vae}{variational auto-encoder}
+\newacronym{KL}{kl}{Kullback-Leibler}
+\newacronym{SGD}{sgd}{stochastic gradient descent}
+\newacronym{SGA}{sga}{stochastic gradient ascent}
+\newacronym{CDAE}{cdae}{coordinate descent auto-encoder}
+
+% skip line instead of indent
+\usepackage[parfill]{parskip}
+
+\title{
+    Notes: Coordinate Descent Auto-Encoder
+}
+
+\author{
+    Tuan Anh and Sid
+}
+
+\date{\today}
+
+\begin{document}
+    \maketitle
+
+    \input{introduction}
+    \input{algorithm}
+
+
+    \bibliography{notes}
+\end{document}
