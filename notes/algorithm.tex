@@ -40,7 +40,7 @@ We propose a two-step algorithm shown in Algorithm~\ref{alg:algorithm/cdae} whic
         \end{align}
         by performing \gls{SGD}: \\
         \For{some number of iterations}{
-            Sample $(x^m, y^m) \sim p(x, y)$. \\
+            Sample $(x^m, y^m) \sim p_{\theta}(x, y)$. \\
             Calculate the gradient $\nabla_{\phi} q_{\phi}(x^m \given y^m)$. \\
             Update $\phi$.
         }
