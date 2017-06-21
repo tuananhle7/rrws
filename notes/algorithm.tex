@@ -34,7 +34,7 @@ We propose a two-step algorithm shown in Algorithm~\ref{alg:algorithm/cdae} whic
         Step 2. Optimize $\phi$: \\
         \begin{align}
             \minimize_{\phi} \left\{
-                \int p_{\theta}(y) \KL{p_{\theta}(x \given y)}{q_{\phi}(x \given y)} \,\mathrm dy 
+                \int p_{\theta}(y) \KL{p_{\theta}(x \given y)}{q_{\phi}(x \given y)} \,\mathrm dy
                 = \int \int p_{\theta}(x, y) q_{\phi}(x \given y) \,\mathrm dx \,\mathrm dy + \text{const.}
             \right\}
         \end{align}
@@ -50,3 +50,7 @@ We propose a two-step algorithm shown in Algorithm~\ref{alg:algorithm/cdae} whic
   \caption{Coordinate Descent Auto-Encoder}
   \label{alg:algorithm/cdae}
 \end{algorithm}
+%%% Local Variables:
+%%% mode: latex
+%%% TeX-master: "notes"
+%%% End:
