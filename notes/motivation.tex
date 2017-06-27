@@ -1,0 +1,30 @@
+
+\section{Objective - Motivation}
+\label{sec:mot}
+
+How do we arrive at our objective?
+%
+Consider first the expressions for the lower and upper bounds of the
+log-marginal likelihood:
+%
+\begin{align*}
+  \log \p[\theta]{y}
+  &=\fnP{\ELBO}{\theta, \phi; y} + \KL{\q[\phi]{x \given y}}{\p[\theta]{x \given y}}\\
+  \log \p[\theta]{y}
+  &=\fnP{\EUBO}{\theta, \phi; y} - \KL{\p[\theta]{x \given y}}{\q[\phi]{x \given y}}\\
+  \intertext{Where the bounds \(\ELBO\) and \(\EUBO\) are given as}
+  \fnP{\ELBO}{\theta, \phi; y}
+  &=\Ex[{\q[\phi]{x \given y}}]{\log \p[\theta]{x, y} - \log \q[\phi]{x \given y}}\\
+  \fnP{\EUBO}{\theta, \phi; y}
+  &=\Ex[{\p[\theta]{x \given y}}]{\log \p[\theta]{x, y} - \log \q[\phi]{x \given y}}
+\end{align*}
+%
+The objective with these expressions is to learn the generative model
+parameters~\(\theta\) that maximise the log-marginal likelihood or evidence.
+%
+\[\argmax_{\theta} \log \p[\theta]{y} \]
+
+%%% Local Variables:
+%%% mode: latex
+%%% TeX-master: "notes"
+%%% End:
