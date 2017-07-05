@@ -39,6 +39,12 @@
 \crefname{algorithm}{Algorithm}{Algorithms}
 \crefname{equation}{Equation}{Equations}
 \crefname{figure}{Figure}{Figure}
+% todonotes
+\presetkeys{todonotes}{%
+  backgroundcolor=blue!10!white,
+  linecolor=blue!10!white,
+  bordercolor=blue!10!white
+}{}
 % misc
 \usepackage[parfill]{parskip}   % skip line instead of indent
 
@@ -50,6 +56,8 @@
 
 \begin{document}
 \maketitle
+
+\listoftodos
 
 \input{introduction}
 \input{algorithm}
