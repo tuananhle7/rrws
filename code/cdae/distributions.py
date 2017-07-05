@@ -39,7 +39,8 @@ def categorical_sample(categories, probabilities):
     output: torch.Tensor [dim_1, ..., dim_N]
     '''
 
-    num_categories, *output_size = categories.size()
+    cat_size = categories.size()
+    num_categories, output_size = cat_size[0], cat_size[1:]
     categories_flattened = categories.contiguous().view(num_categories, -1)
     probabilities_flattened = probabilities.contiguous().view(num_categories, -1)
 
