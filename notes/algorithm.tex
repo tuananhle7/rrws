@@ -7,13 +7,16 @@ Let $x$ be latent variables and $y$ be observed variables.
 Consider a family of forward generative models $p_{\theta}(x, y)$ parameterized by $\theta$.
 Let $q_{\phi}(x \given y)$ be a family of inference networks parameterized by $\phi$.
 Given a set of unsupervised training data $(y^{(n)})_{n = 1}^N$ drawn from the true model $p_{\theta_{\text{true}}}(y)$, we are trying to
+%
 \begin{itemize}
-    \item maximize $\frac{1}{N} \sum_{n = 1}^N \log p_{\theta}(y^{(n)})$ with respect to $\theta$, and
-    \item minimize $\int p(y) d(q_{\phi}(x \given y), p_{\theta}(x \given y)) \,\mathrm dx$ with respect to $\phi$
+\item maximize $\displaystyle\frac{1}{N} \sum_{n = 1}^N \log p_{\theta}(y^{(n)})$ with respect to $\theta$, and
+\item minimize $\displaystyle\int p(y) d(q_{\phi}(x \given y), p_{\theta}(x \given y)) \,\mathrm dx$ with respect to $\phi$
 \end{itemize}
+%
 where $d(\cdot, \cdot)$ is some distance between distributions.
 
 We propose a two-step algorithm shown in \cref{alg:algorithm/cdae} which we call the \gls{CDAE}.
+%
 \begin{algorithm}
   \KwData{data $(y^{(n)})_{n = 1}^N$, generative model $p_{\theta}$, inference network $q_{\phi}$}
   \KwResult{learned parameters $\theta, \phi$}
@@ -50,6 +53,7 @@ We propose a two-step algorithm shown in \cref{alg:algorithm/cdae} which we call
   \caption{Coordinate Descent Auto-Encoder}
   \label{alg:algorithm/cdae}
 \end{algorithm}
+
 %%% Local Variables:
 %%% mode: latex
 %%% TeX-master: "notes"
