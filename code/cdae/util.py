@@ -2,17 +2,17 @@ import logging
 import torch
 import sys
 
+
 def chunk(total, part):
-    '''
-    Returns a list with elements [part, ..., part, remainder] which sum up to total.
-    Returns [part, ..., part] if remainder is 0.
+    """Returns a list with elements `[part, ..., part, remainder]` which sum up
+    to `total`. Returns `[part, ..., part]` if `remainder` is 0.
 
     input:
         total: number
         part: number
 
     output: list
-    '''
+    """
 
     num_parts = total // part
     remainder = total % part
@@ -22,22 +22,22 @@ def chunk(total, part):
     else:
         return [part] * num_parts + [remainder]
 
+
 def init(opt):
     # Random seed
     torch.manual_seed(opt.seed)
 
-    # Agnostic Tensor
-    global Tensor
+    # Default Tensor
     global cuda
     if torch.cuda.is_available() and opt.cuda:
         cuda = True
         torch.cuda.set_device(opt.device)
         torch.cuda.manual_seed(opt.seed)
         torch.backends.cudnn.enabled = True
-        Tensor = torch.cuda.FloatTensor
+        torch.set_default_tensor_type('torch.cuda.FloatTensor')
     else:
         cuda = False
-        Tensor = torch.FloatTensor
+        torch.set_default_tensor_type('torch.FloatTensor')
         opt.cuda = False
 
     # Logging
