@@ -1,17 +1,18 @@
 import torch
 import numpy as np
+import cdae.util as util
 
 def normal_sample(mean, var):
     '''
-    Returns a torch.Tensor of samples from Normal(mean, var)
+    Returns a Tensor of samples from Normal(mean, var)
 
     input:
-        mean: torch.Tensor [dim_1 * ... * dim_N]
-        var: torch.Tensor [dim_1 * ... * dim_N]
-    output: torch.Tensor [dim_1 * ... * dim_N]
+        mean: Tensor [dim_1 * ... * dim_N]
+        var: Tensor [dim_1 * ... * dim_N]
+    output: Tensor [dim_1 * ... * dim_N]
     '''
 
-    ret = torch.FloatTensor(mean.size()).normal_()
+    ret = util.Tensor(mean.size()).normal_()
     return ret.mul_(torch.sqrt(var)).add_(mean)
 
 def normal_logpdf(x, mean, var):
@@ -30,13 +31,13 @@ def normal_logpdf(x, mean, var):
 
 def categorical_sample(categories, probabilities):
     '''
-    Returns a torch.Tensor of samples from Categorical(categories, probabilities)
+    Returns a Tensor of samples from Categorical(categories, probabilities)
 
     input:
-        categories: torch.Tensor [num_categories, dim_1, ..., dim_N]
-        probabilities: torch.Tensor [num_categories, dim_1, ..., dim_N]
+        categories: Tensor [num_categories, dim_1, ..., dim_N]
+        probabilities: Tensor [num_categories, dim_1, ..., dim_N]
 
-    output: torch.Tensor [dim_1, ..., dim_N]
+    output: Tensor [dim_1, ..., dim_N]
     '''
 
     cat_size = categories.size()
@@ -49,7 +50,10 @@ def categorical_sample(categories, probabilities):
     for n in range(output_nelement):
         output_numpy_flattened[n] = np.random.choice(categories_flattened[:, n].numpy(), p=probabilities_flattened[:, n].numpy())
 
-    return torch.from_numpy(output_numpy_flattened).float().view(*output_size)
+    if util.cuda:
+        return torch.from_numpy(output_numpy_flattened).float().view(*output_size).cuda()
+    else:
+        return torch.from_numpy(output_numpy_flattened).float().view(*output_size)
 
 def categorical_logpdf(x, categories, probabilities):
     '''
@@ -65,5 +69,5 @@ def categorical_logpdf(x, categories, probabilities):
 
     num_categories = categories.size(0)
     x_expanded = x.unsqueeze(0).expand_as(categories)
-    mask = (x_expanded == categories).float()
+    mask = (x_expanded == categories).float().cuda() if util.cuda else (x_expanded == categories).float()
     return torch.log(torch.sum(probabilities * mask, dim=0))
