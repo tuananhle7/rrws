@@ -51,3 +51,13 @@ def init(opt):
         formatter = logging.Formatter('%(asctime)s: %(message)s')
         console_handler.setFormatter(formatter)
         logger.addHandler(console_handler)
+
+    # Visdom
+    if opt.visdom:
+        try:
+            import visdom
+            global vis
+            vis = visdom.Visdom()
+        except ImportError:
+            log_warning('Visdom server not available, disabling')
+            opt.visdom = False
