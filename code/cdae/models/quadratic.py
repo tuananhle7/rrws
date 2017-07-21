@@ -7,6 +7,7 @@ import torch.utils.data
 import numpy as np
 
 from .. import distributions as dists
+from .. import util as util
 
 ##########################
 # True generative model
@@ -17,7 +18,7 @@ class GenerativeModel():
     """
     The true generative model $p$ over latents $k, x$ and observed variables $y$ is:
         \begin{align}
-            k &\sim \mathrm{Categorical}([10, 20], [0.5, 0.5]) \\\
+            k &\sim \mathrm{Categorical}([2, 5], [0.5, 0.5]) \\\
             x &\sim \mathrm{Normal}(0, 1) \\\
             y &\sim \mathrm{Normal}(f(k, x) ,1)
         \end{align}
@@ -60,7 +61,7 @@ class GenerativeModel():
         """
 
         k = dists.categorical_sample(
-            categories=torch.Tensor([10, 20]).unsqueeze(-1).unsqueeze(-1).expand(2, batch_size, 1),
+            categories=torch.Tensor([2, 5]).unsqueeze(-1).unsqueeze(-1).expand(2, batch_size, 1),
             probabilities=torch.Tensor([0.5, 0.5])
             .unsqueeze(-1).unsqueeze(-1).expand(2, batch_size, 1)
         )
@@ -146,11 +147,9 @@ class GenerativeNetwork(nn.Module):
         Initialize generative network.
         '''
         super(GenerativeNetwork, self).__init__()
-        self.lin1 = nn.Linear(2, 16)
-        self.lin2 = nn.Linear(16, 1)
-
-        init.xavier_uniform(self.lin1.weight, gain=init.calculate_gain('relu'))
-        init.xavier_uniform(self.lin2.weight)
+        self.a = nn.Parameter(torch.randn(1))
+        self.b = nn.Parameter(torch.randn(1))
+        self.c = nn.Parameter(torch.randn(1))
 
     def f_approx(self, k, x):
         '''
@@ -163,11 +162,11 @@ class GenerativeNetwork(nn.Module):
         output: Variable [batch_size, 1]
         '''
 
-        ret = self.lin1(torch.cat([k, x], dim=1))
-        ret = F.relu(ret)
-        ret = self.lin2(ret)
+        a_expanded = self.a.unsqueeze(0).expand_as(k)
+        b_expanded = self.b.unsqueeze(0).expand_as(k)
+        c_expanded = self.c.unsqueeze(0).expand_as(k)
 
-        return ret
+        return a_expanded * (k + x)**2 + b_expanded * (k + x) + c_expanded
 
     def forward(self, k, x, y):
         '''
@@ -186,7 +185,7 @@ class GenerativeNetwork(nn.Module):
         logpdf_k = dists.categorical_logpdf(
             k,
             categories=Variable(
-                torch.Tensor([10, 20]).unsqueeze(-1).unsqueeze(-1).expand(2, batch_size, 1)
+                torch.Tensor([2, 5]).unsqueeze(-1).unsqueeze(-1).expand(2, batch_size, 1)
             ),
             probabilities=Variable(
                 torch.Tensor([0.5, 0.5]).unsqueeze(-1).unsqueeze(-1).expand(2, batch_size, 1)
@@ -218,7 +217,7 @@ class GenerativeNetwork(nn.Module):
         '''
 
         k = dists.categorical_sample(
-            categories=torch.Tensor([10, 20]).unsqueeze(-1).unsqueeze(-1).expand(2, batch_size, 1),
+            categories=torch.Tensor([2, 5]).unsqueeze(-1).unsqueeze(-1).expand(2, batch_size, 1),
             probabilities=torch.Tensor([0.5, 0.5])
             .unsqueeze(-1).unsqueeze(-1).expand(2, batch_size, 1)
         )
@@ -251,7 +250,7 @@ class InferenceNetwork(nn.Module):
     Let
     \begin{align}
         q_{\phi}(k, x \lvert y) &= q_{\phi}(k \lvert y) q_{\phi}(x \lvert k, y) \\\
-        q_{\phi}(k \lvert y) &= \mathrm{Categorical}([10, 20], [\phi_1, \phi_2]) \\\
+        q_{\phi}(k \lvert y) &= \mathrm{Categorical}([2, 5], [\phi_1, \phi_2]) \\\
         q_{\phi}(x \lvert k, y) &= \mathrm{Normal}(\phi_3, \phi_4)
     \end{align}
     where $\phi = [\phi_1, \dotsc, \phi_4]$ is the output of the inference network.
@@ -291,7 +290,8 @@ class InferenceNetwork(nn.Module):
         ret = self.k_lin1(y)
         ret = F.relu(ret)
         ret = self.k_lin2(ret)
-        ret = F.softmax(ret)
+        ret = F.softmax(ret) + util.epsilon
+        ret = ret / torch.sum(ret, dim=1).expand_as(ret)
 
         return ret
 
@@ -315,7 +315,7 @@ class InferenceNetwork(nn.Module):
         var = self.x_var_lin1(torch.cat([k, y], dim=1))
         var = F.relu(var)
         var = self.x_var_lin2(var)
-        var = F.softplus(var)
+        var = F.softplus(var) + util.epsilon
 
         return mean, var
 
@@ -336,7 +336,7 @@ class InferenceNetwork(nn.Module):
         logpdf_k = dists.categorical_logpdf(
             k,
             categories=Variable(
-                torch.Tensor([10, 20]).unsqueeze(-1).unsqueeze(-1).expand(2, batch_size, 1)
+                torch.Tensor([2, 5]).unsqueeze(-1).unsqueeze(-1).expand(2, batch_size, 1)
             ),
             probabilities=torch.t(probabilities).unsqueeze(-1)
         )
@@ -366,7 +366,7 @@ class InferenceNetwork(nn.Module):
 
         probabilities = self.get_q_k_params(Variable(y, volatile=True)).data
         k = dists.categorical_sample(
-            categories=torch.Tensor([10, 20]).unsqueeze(-1).unsqueeze(-1).expand(2, batch_size, 1),
+            categories=torch.Tensor([2, 5]).unsqueeze(-1).unsqueeze(-1).expand(2, batch_size, 1),
             probabilities=torch.t(probabilities).unsqueeze(-1)
         )
 

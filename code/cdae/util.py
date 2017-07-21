@@ -24,6 +24,10 @@ def chunk(total, part):
 
 
 def init(opt):
+    # Numerical issues
+    global epsilon
+    epsilon = 1e-6
+
     # Random seed
     torch.manual_seed(opt.seed)
 
