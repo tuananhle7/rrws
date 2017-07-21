@@ -380,7 +380,7 @@ class InferenceNetwork(nn.Module):
 
 
 ##########################
-# Inference network
+# Dataset
 ##########################
 
 
