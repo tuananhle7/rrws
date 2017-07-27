@@ -5,16 +5,20 @@ import torch.nn.functional as F
 from torch.autograd import Variable
 import torch.utils.data
 import numpy as np
+import seaborn as sns
+import matplotlib.pyplot as plt
 
+from . import model
 from .. import distributions as dists
 from .. import util as util
+
 
 ##########################
 # True generative model
 ##########################
 
 
-class GenerativeModel():
+class QuadraticGenerativeModel(model.GenerativeModel):
     """
     The true generative model $p$ over latents $k, x$ and observed variables $y$ is:
         \begin{align}
@@ -55,9 +59,8 @@ class GenerativeModel():
             batch_size: int
 
         output:
-            k: Tensor [batch_size, 1]
-            x: Tensor [batch_size, 1]
-            y: Tensor [batch_size, 1]
+            [k, x]: [Tensor [batch_size, 1], Tensor [batch_size, 1]]
+            [y]: [Tensor [batch_size, 1]]
         """
 
         k = dists.categorical_sample(
@@ -77,7 +80,7 @@ class GenerativeModel():
             var=var
         )
 
-        return k, x, y
+        return [k, x], [y]
 
     def importance_sample(self, y, num_particles, resample=True, num_resample=None):
         """
@@ -101,7 +104,7 @@ class GenerativeModel():
         """
 
         y_expanded = torch.Tensor([y]).expand(num_particles)
-        k, x, _ = self.sample(num_particles)
+        [k, x], _ = self.sample(num_particles)
         k = k.squeeze(1)
         x = x.squeeze(1)
 
@@ -134,7 +137,7 @@ class GenerativeModel():
 ##########################
 
 
-class GenerativeNetwork(nn.Module):
+class QuadraticGenerativeNetwork(model.GenerativeNetwork):
     """
     Assume that we actually don't know the form of $f$ and that we want to learn it, i.e. the true
     model $p$ from a dataset $(y^{(n)})_{n = 1}^N$.
@@ -143,16 +146,16 @@ class GenerativeNetwork(nn.Module):
     by generative weights $\theta$ such that it maps from $\mathbb R^2$ to $\mathbb R$.
     """
     def __init__(self):
-        '''
+        """
         Initialize generative network.
-        '''
-        super(GenerativeNetwork, self).__init__()
+        """
+        super(QuadraticGenerativeNetwork, self).__init__()
         self.a = nn.Parameter(torch.randn(1))
         self.b = nn.Parameter(torch.randn(1))
         self.c = nn.Parameter(torch.randn(1))
 
     def f_approx(self, k, x):
-        '''
+        """
         Returns output of current approximation of f.
 
         input:
@@ -160,7 +163,7 @@ class GenerativeNetwork(nn.Module):
             x: Variable [batch_size, 1]
 
         output: Variable [batch_size, 1]
-        '''
+        """
 
         a_expanded = self.a.unsqueeze(0).expand_as(k)
         b_expanded = self.b.unsqueeze(0).expand_as(k)
@@ -169,7 +172,7 @@ class GenerativeNetwork(nn.Module):
         return a_expanded * (k + x)**2 + b_expanded * (k + x) + c_expanded
 
     def forward(self, k, x, y):
-        '''
+        """
         Returns log p_{\theta}(k, x, y)
 
         input:
@@ -177,8 +180,8 @@ class GenerativeNetwork(nn.Module):
             x: Variable [batch_size, 1]
             y: Variable [batch_size, 1]
 
-        output: Variable [batch_size, 1]
-        '''
+        output: Variable [batch_size]
+        """
 
         batch_size = k.size(0)
 
@@ -201,20 +204,19 @@ class GenerativeNetwork(nn.Module):
         var = Variable(torch.ones(mean.size()))
         logpdf_y = dists.normal_logpdf(y, mean, var)
 
-        return logpdf_k + logpdf_x + logpdf_y
+        return (logpdf_k + logpdf_x + logpdf_y).unsqueeze(1)
 
     def sample(self, batch_size):
-        '''
-        Returns sample from the generative model.
+        """
+        Returns sample from the generative network.
 
         input:
             batch_size: int
 
         output:
-            k: Tensor [batch_size, 1]
-            x: Tensor [batch_size, 1]
-            y: Tensor [batch_size, 1]
-        '''
+            [k, x]: [Tensor [batch_size, 1], Tensor [batch_size, 1]]
+            [y]: [Tensor [batch_size, 1]]
+        """
 
         k = dists.categorical_sample(
             categories=torch.Tensor([2, 5]).unsqueeze(-1).unsqueeze(-1).expand(2, batch_size, 1),
@@ -233,7 +235,7 @@ class GenerativeNetwork(nn.Module):
             var=var
         )
 
-        return k, x, y
+        return [k, x], [y]
 
 
 ##########################
@@ -241,7 +243,7 @@ class GenerativeNetwork(nn.Module):
 ##########################
 
 
-class InferenceNetwork(nn.Module):
+class QuadraticInferenceNetwork(model.InferenceNetwork):
     """We seek to learn an inference network $q_{\phi}(k, x \lvert y)$ parameterized by $\phi$
 
     which, given $y$ maps to the parameters of the distribution over $(k, x)$, ideally close to the
@@ -256,11 +258,11 @@ class InferenceNetwork(nn.Module):
     where $\phi = [\phi_1, \dotsc, \phi_4]$ is the output of the inference network.
     """
     def __init__(self):
-        '''
+        """
         Initialize inference network.
-        '''
+        """
 
-        super(InferenceNetwork, self).__init__()
+        super(QuadraticInferenceNetwork, self).__init__()
         self.k_lin1 = nn.Linear(1, 16)
         self.k_lin2 = nn.Linear(16, 2)
 
@@ -278,14 +280,14 @@ class InferenceNetwork(nn.Module):
         init.xavier_uniform(self.x_var_lin2.weight)
 
     def get_q_k_params(self, y):
-        '''
+        """
         Returns parameters \phi_1, \phi_2.
 
         input:
             y: Variable [batch_size, 1]
 
         output: Variable [batch_size, 2]
-        '''
+        """
 
         ret = self.k_lin1(y)
         ret = F.relu(ret)
@@ -296,7 +298,7 @@ class InferenceNetwork(nn.Module):
         return ret
 
     def get_q_x_params(self, k, y):
-        '''
+        """
         Returns parameters \phi_3, \phi_4.
 
         input:
@@ -306,7 +308,7 @@ class InferenceNetwork(nn.Module):
         output:
             mean: Variable [batch_size, 1]
             var: Variable [batch_size, 1]
-        '''
+        """
 
         mean = self.x_mean_lin1(torch.cat([k, y], dim=1))
         mean = F.relu(mean)
@@ -320,7 +322,7 @@ class InferenceNetwork(nn.Module):
         return mean, var
 
     def forward(self, k, x, y):
-        '''
+        """
         Returns log q_{\phi}(k, x | y)
 
         input:
@@ -328,8 +330,8 @@ class InferenceNetwork(nn.Module):
             x: Variable [batch_size, 1]
             y: Variable [batch_size, 1]
 
-        output: Variable [batch_size, 1]
-        '''
+        output: Variable [batch_size]
+        """
         batch_size, _ = k.size()
 
         probabilities = self.get_q_k_params(y)
@@ -348,19 +350,18 @@ class InferenceNetwork(nn.Module):
             var=var
         )
 
-        return logpdf_k + logpdf_x
+        return (logpdf_k + logpdf_x).unsqueeze(1)
 
     def sample(self, y):
-        '''
+        """
         Returns samples from q_{\phi}(k, x | y)
 
         input:
             y: Tensor [batch_size, 1]
 
         output:
-            k: Tensor [batch_size, 1]
-            x: Tensor [batch_size, 1]
-        '''
+            [k, x]: [Tensor [batch_size, 1], Tensor [batch_size, 1]]
+        """
 
         batch_size = y.size(0)
 
@@ -376,44 +377,186 @@ class InferenceNetwork(nn.Module):
             var=var.data
         )
 
-        return k, x
+        return [k, x]
 
 
 ##########################
-# Dataset
+# Plotting scripts
 ##########################
 
 
-class Dataset(torch.utils.data.Dataset):
-    def __init__(self, infinite_data=None, num_data=None, data_generator=None):
-        '''
-        Initializes quadratic Dataset. If infinite_data is True, generates data on the fly,
-        otherwise generates data once at the start.
+def plot_quadratic_generative_comparison(
+    quadratic_generative_model,
+    quadratic_generative_network,
+    num_data,
+    filename
+):
+    fig, ax = plt.subplots(ncols=1, nrows=1)
 
-        input:
-            infinite_data: bool. If True, supply fake_num_data and data_generator, otherwise supply
-            data
-            num_data: number. In the case of infinite_data, this forms as a fake num_data in order
-            to be able to talk about "epochs".
-            data_generator: function that generates a sample from the true generative model
-        '''
-        assert(type(infinite_data) is bool)
-        assert(type(num_data) is int)
-        assert(callable(data_generator))
+    _, [y] = quadratic_generative_model.sample(num_data)
+    y = y.squeeze(1).numpy()
+    sns.kdeplot(y, ax=ax, label='true model $p(y)$')
 
-        self.infinite_data = infinite_data
-        if infinite_data:
-            self.num_data = num_data
-            self.data_generator = lambda: np.float32(data_generator())
-        else:
-            self.num_data = num_data
-            self.data = np.array([np.float32(data_generator()) for i in range(num_data)])
+    _, [y] = quadratic_generative_network.sample(num_data)
+    y = y.squeeze(1).numpy()
+    sns.kdeplot(y, ax=ax, label='learned model $p_{\\theta}(y)$')
 
-    def __len__(self):
-        return self.num_data
+    ax.set_ylabel('KDE')
+    ax.set_xlabel('$y$')
+    ax.set_title('Testing the Generative Model')
 
-    def __getitem__(self, index):
-        if self.infinite_data:
-            return self.data_generator()
-        else:
-            return self.data[index]
+    fig.savefig(filename, bbox_inches='tight')
+
+
+def plot_quadratic_comparison(
+    quadratic_generative_model,
+    quadratic_generative_network,
+    filename
+):
+    fig, ax = plt.subplots(ncols=1, nrows=1)
+    true_quadratic = quadratic_generative_model.f(
+        torch.zeros(100),
+        torch.linspace(-10, 10, 100)
+    ).numpy()
+    learned_quadratic = quadratic_generative_network.f_approx(
+        Variable(torch.zeros(100).unsqueeze(-1)),
+        Variable(torch.linspace(-10, 10, 100).unsqueeze(-1))
+    ).data.numpy()
+
+    ax.plot(np.linspace(-10, 10, 100), true_quadratic, label='true quadratic')
+    ax.plot(np.linspace(-10, 10, 100), learned_quadratic, label='learned quadratic')
+    ax.set_xlabel('$x$')
+    ax.set_ylabel('$ax^2 + bx + c$')
+    ax.set_title('Quadratic')
+    ax.legend()
+
+    fig.savefig(filename, bbox_inches='tight')
+
+
+def plot_quadratic_inference_comparison(
+    quadratic_generative_model,
+    quadratic_inference_network,
+    num_inference_network_samples,
+    num_importance_particles,
+    y_test,
+    filename
+):
+    colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
+
+    fig, ax = plt.subplots(nrows=2, ncols=2)
+    fig.set_size_inches(10, 10)
+    fig.suptitle('Testing inference\n$y = {}$'.format(y_test))
+    bar_width = 0.8
+
+    ##############
+    ##############
+    ##############
+
+    y = torch.Tensor([[y_test]]).expand(num_inference_network_samples, 1)
+    [k, x] = quadratic_inference_network.sample(y)
+
+    values = [2, 5]
+    normalized_weights = [
+        torch.sum(k == 2) / len(k),
+        torch.sum(k == 5) / len(k),
+    ]
+    bar1 = ax[0][0].bar(
+        np.array(values) - bar_width / 2,
+        normalized_weights,
+        width=bar_width,
+        tick_label=values,
+        color=colors[0],
+        label='$q_{\phi}(k | y)$'
+    )
+    sns.kdeplot(x.view(-1).numpy(), ax=ax[0][1], label='$q_{\phi}(x | y)$', color=colors[0])
+
+    if len(x[k == 2]) != 0:
+        sns.kdeplot(
+            x[k == 2].view(-1).numpy(),
+            ax=ax[1][0],
+            label='$q_{\phi}(x | y, k = 2)$',
+            color=colors[0]
+        )
+    else:
+        ax[1][0].axhline(0, label='$q_{\phi}(x | y, k = 2)$', color=colors[0])
+
+    if len(x[k == 5]) != 0:
+        sns.kdeplot(
+            x[k == 5].view(-1).numpy(),
+            ax=ax[1][1],
+            label='$q_{\phi}(x | y, k = 5)$',
+            color=colors[0]
+        )
+    else:
+        ax[1][1].axhline(0, label='$q_{\phi}(x | y, k = 5)$', color=colors[0])
+
+    ##############
+    ##############
+    ##############
+
+    k, x = quadratic_generative_model.importance_sample(
+        y_test,
+        num_importance_particles,
+        resample=True,
+        num_resample=num_importance_particles
+    )
+
+    values = [2, 5]
+    normalized_weights = [
+        sum(k == 2) / len(k),
+        sum(k == 5) / len(k),
+    ]
+    bar2 = ax[0][0].bar(
+        np.array(values) + bar_width / 2,
+        normalized_weights,
+        tick_label=values,
+        label='$p(k | y)$',
+        color=colors[1]
+    )
+
+    sns.distplot(x.numpy(), hist=False, ax=ax[0][1], label='$p(x | y)$', color=colors[1])
+
+    if normalized_weights[0] != 0:
+        sns.distplot(
+            x[k == 2].numpy(),
+            hist=False,
+            ax=ax[1][0],
+            label='$p(x | y, k = 2)$',
+            color=colors[1]
+        )
+    else:
+        ax[1][0].axhline(0, label='$p(x | y, k = 2)$', color=colors[1])
+
+    if normalized_weights[1] != 0:
+        sns.distplot(
+            x[k == 5].numpy(),
+            hist=False,
+            ax=ax[1][1],
+            label='$p(x | y, k = 5)$',
+            color=colors[1]
+        )
+    else:
+        ax[1][1].axhline(0, label='$p(x | y, k = 5)$', color=colors[1])
+
+    ##############
+    ##############
+    ##############
+
+    ax[0][0].set_xticks(np.array([2, 5]))
+    ax[0][0].xaxis.grid(False)
+    ax[0][0].set_ylim([0, 1])
+    ax[0][0].set_title('Histogram of $k | y$')
+    ax[0][0].set_xlabel('$k$')
+    ax[0][0].legend()
+
+    ax[0][1].set_title('Kernel density estimate of $x | y$')
+    ax[0][1].set_xlabel('$x$')
+
+    ax[1][0].set_title('Kernel density estimate of $x | y, k = 2$')
+    ax[1][0].set_xlabel('$x$')
+
+    ax[1][1].set_title('Kernel density estimate of $x | y, k = 5$')
+    ax[1][1].set_xlabel('$x$')
+    ax[1][1].legend()
+
+    fig.savefig(filename, bbox_inches='tight')
