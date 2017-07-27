@@ -57,10 +57,11 @@ def init(opt):
         logger.addHandler(console_handler)
 
     # Visdom
+    global vis
+    vis = None
     if opt.visdom:
         try:
             import visdom
-            global vis
             vis = visdom.Visdom()
         except ImportError:
             log_warning('Visdom server not available, disabling')

@@ -7,10 +7,10 @@ import torch.utils.data
 import numpy as np
 import seaborn as sns
 import matplotlib.pyplot as plt
-
 from . import model
 from .. import distributions as dists
 from .. import util as util
+plt.style.use('seaborn-whitegrid')
 
 
 ##########################

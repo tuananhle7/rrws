@@ -6,6 +6,7 @@ import torch.optim as optim
 import torch.utils.data
 import seaborn as sns
 import matplotlib.pyplot as plt
+plt.style.use('seaborn-whitegrid')
 
 
 def train_cdae(
@@ -45,7 +46,7 @@ def train_cdae(
 
     generative_network_objective = []
     inference_network_objective = []
-    if util.vis:
+    if util.vis is not None:
         util.vis.close()
         generative_network_objective_line = util.vis.line(
             X=np.array([0]),
@@ -87,13 +88,13 @@ def train_cdae(
                 loss.backward()
                 generative_network_optim.step()
             generative_network_objective.append(np.mean(temp_generative_network_objective))
-
-            util.vis.line(
-                X=np.arange(len(generative_network_objective)),
-                Y=np.nan_to_num(np.array(generative_network_objective)),
-                update='replace',
-                win=generative_network_objective_line
-            )
+            if util.vis is not None:
+                util.vis.line(
+                    X=np.arange(len(generative_network_objective)),
+                    Y=np.nan_to_num(np.array(generative_network_objective)),
+                    update='replace',
+                    win=generative_network_objective_line
+                )
             util.logger.info(
                 'Generative network step | Epoch {0} | Objective {1}'.format(
                     epoch,
@@ -118,12 +119,13 @@ def train_cdae(
                 loss.backward()
                 inference_network_optim.step()
             inference_network_objective.append(np.mean(temp_inference_network_objective))
-            util.vis.line(
-                X=np.arange(len(inference_network_objective)),
-                Y=np.nan_to_num(np.array(inference_network_objective)),
-                update='replace',
-                win=inference_network_objective_line
-            )
+            if util.vis is not None:
+                util.vis.line(
+                    X=np.arange(len(inference_network_objective)),
+                    Y=np.nan_to_num(np.array(inference_network_objective)),
+                    update='replace',
+                    win=inference_network_objective_line
+                )
             util.logger.info(
                 'Inference network step | Epoch {0} | Objective {1}'.format(
                     epoch,
