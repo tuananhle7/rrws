@@ -80,3 +80,94 @@ def categorical_logpdf(x, categories, probabilities):
         util.cuda else \
         (x_expanded == categories).float()
     return torch.log(torch.sum(probabilities * mask, dim=0))
+
+
+def gumbel_sample(location, scale):
+    """
+    Returns a Tensor of samples from Gumbel(location, scale).
+
+    input:
+        location: Tensor [dim_1, ..., dim_N]
+        scale: Tensor [dim_1, ..., dim_N]
+
+    output: Tensor [dim_1, ..., dim_N]
+    """
+
+    return location - scale * torch.log(-torch.log(torch.rand(location.size())))
+
+
+def gumbel_logpdf(value, location, scale):
+    """
+    Returns Gumbel logpdfs.
+
+    input:
+        value: Tensor/Variable [dim_1, ..., dim_N]
+        location: Tensor/Variable [dim_1, ..., dim_N]
+        scale: Tensor/Variable [dim_1, ..., dim_N]
+
+    output: Tensor/Variable [dim_1, ..., dim_N]
+    """
+
+    temp = (value - location) / scale
+
+    return -(temp + torch.exp(-temp)) - torch.log(scale)
+
+
+def concrete_sample(location, temperature):
+    """
+    Returns a Tensor of samples from Concrete(location, temperature).
+
+    input:
+        location: Tensor [num_categories, dim_1, ..., dim_N] (or [num_categories])
+        temperature: Tensor [dim_1, ..., dim_N] (or int/float/[1])
+
+    output: Tensor [num_categories, dim_1, ..., dim_N] (or [num_categories])
+    """
+
+    if location.ndimension() == 1:
+        if isinstance(temperature, (int, float)):
+            temperature = torch.Tensor([temperature])
+        temperature_expanded = temperature.expand_as(location)
+    else:
+        temperature_expanded = temperature.unsqueeze(0).expand_as(location)
+    gumbels = gumbel_sample(torch.zeros(location.size()), torch.ones(location.size()))
+
+    numerator = torch.exp((torch.log(location) + gumbels) / temperature_expanded)
+    denominator = torch.sum(numerator, dim=0).expand_as(numerator)
+
+    return numerator / denominator
+
+
+def concrete_logpdf(value, location, temperature):
+    """
+    Returns a Tensor of Concrete logpdfs.
+
+    input:
+        value: Tensor/Variable [num_categories, dim_1, ..., dim_N] (or [num_categories])
+        location: Tensor/Variable [num_categories, dim_1, ..., dim_N] (or [num_categories])
+        temperature: Tensor/Variable [dim_1, ..., dim_N] (or int/float/[1])
+    output: Tensor/Variable [dim_1, ..., dim_N] (or [1])
+    """
+
+    num_categories, *_ = value.size()
+
+    if location.ndimension() == 1:
+        if isinstance(temperature, (int, float)):
+            if isinstance(location, Variable):
+                temperature = Variable(torch.Tensor([temperature]))
+            else:
+                temperature = torch.Tensor([temperature])
+        temperature_expanded = temperature.expand_as(location)
+    else:
+        temperature_expanded = temperature.unsqueeze(0).expand_as(location)
+
+    return torch.sum(torch.arange(1, num_categories)) + \
+        (num_categories - 1) * torch.log(temperature) + \
+        torch.sum(
+            torch.log(location) - (temperature_expanded + 1) * torch.log(value),
+            dim=0
+        ).squeeze(0) - \
+        num_categories * torch.log(torch.sum(
+            location * (value**(-temperature_expanded)),
+            dim=0
+        ).squeeze(0))
