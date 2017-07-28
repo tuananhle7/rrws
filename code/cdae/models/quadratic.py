@@ -292,7 +292,7 @@ class QuadraticInferenceNetwork(model.InferenceNetwork):
         ret = self.k_lin1(y)
         ret = F.relu(ret)
         ret = self.k_lin2(ret)
-        ret = F.softmax(ret) + util.epsilon
+        ret = F.softmax(ret)
         ret = ret / torch.sum(ret, dim=1).expand_as(ret)
 
         return ret
@@ -317,7 +317,7 @@ class QuadraticInferenceNetwork(model.InferenceNetwork):
         var = self.x_var_lin1(torch.cat([k, y], dim=1))
         var = F.relu(var)
         var = self.x_var_lin2(var)
-        var = F.softplus(var) + util.epsilon
+        var = F.softplus(var)
 
         return mean, var
 
