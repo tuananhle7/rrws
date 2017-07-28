@@ -137,7 +137,7 @@ class QuadraticGenerativeModel(model.GenerativeModel):
 ##########################
 
 
-class QuadraticGenerativeNetwork(model.GenerativeNetwork):
+class QuadraticGenerativeNetworkSmall(model.GenerativeNetwork):
     """
     Assume that we actually don't know the form of $f$ and that we want to learn it, i.e. the true
     model $p$ from a dataset $(y^{(n)})_{n = 1}^N$.
@@ -149,7 +149,7 @@ class QuadraticGenerativeNetwork(model.GenerativeNetwork):
         """
         Initialize generative network.
         """
-        super(QuadraticGenerativeNetwork, self).__init__()
+        super(QuadraticGenerativeNetworkSmall, self).__init__()
         self.a = nn.Parameter(torch.randn(1))
         self.b = nn.Parameter(torch.randn(1))
         self.c = nn.Parameter(torch.randn(1))
@@ -204,7 +204,111 @@ class QuadraticGenerativeNetwork(model.GenerativeNetwork):
         var = Variable(torch.ones(mean.size()))
         logpdf_y = dists.normal_logpdf(y, mean, var)
 
-        return (logpdf_k + logpdf_x + logpdf_y).unsqueeze(1)
+        return (logpdf_k + logpdf_x + logpdf_y).squeeze(1)
+
+    def sample(self, batch_size):
+        """
+        Returns sample from the generative network.
+
+        input:
+            batch_size: int
+
+        output:
+            [k, x]: [Tensor [batch_size, 1], Tensor [batch_size, 1]]
+            [y]: [Tensor [batch_size, 1]]
+        """
+
+        k = dists.categorical_sample(
+            categories=torch.Tensor([2, 5]).unsqueeze(-1).unsqueeze(-1).expand(2, batch_size, 1),
+            probabilities=torch.Tensor([0.5, 0.5])
+            .unsqueeze(-1).unsqueeze(-1).expand(2, batch_size, 1)
+        )
+        x = dists.normal_sample(
+            mean=torch.zeros(batch_size, 1),
+            var=torch.ones(batch_size, 1)
+        )
+
+        mean = self.f_approx(Variable(k, volatile=True), Variable(x, volatile=True)).data
+        var = torch.ones(mean.size())
+        y = dists.normal_sample(
+            mean=mean,
+            var=var
+        )
+
+        return [k, x], [y]
+
+
+class QuadraticGenerativeNetworkLarge(model.GenerativeNetwork):
+    """
+    Assume that we actually don't know the form of $f$ and that we want to learn it, i.e. the true
+    model $p$ from a dataset $(y^{(n)})_{n = 1}^N$.
+
+    Let's model the family of functions $f$ under consideration as a neural network parameterized
+    by generative weights $\theta$ such that it maps from $\mathbb R^2$ to $\mathbb R$.
+    """
+    def __init__(self):
+        """
+        Initialize generative network.
+        """
+
+        super(QuadraticGenerativeNetworkLarge, self).__init__()
+        self.lin1 = nn.Linear(2, 16)
+        self.lin2 = nn.Linear(16, 1)
+
+        init.xavier_uniform(self.lin1.weight, gain=init.calculate_gain('relu'))
+        init.xavier_uniform(self.lin2.weight)
+
+    def f_approx(self, k, x):
+        """
+        Returns output of current approximation of f.
+
+        input:
+            k: Variable [batch_size, 1]
+            x: Variable [batch_size, 1]
+
+        output: Variable [batch_size, 1]
+        """
+
+        ret = self.lin1(torch.cat([k, x], dim=1))
+        ret = F.relu(ret)
+        ret = self.lin2(ret)
+
+        return ret
+
+    def forward(self, k, x, y):
+        """
+        Returns log p_{\theta}(k, x, y)
+
+        input:
+            k: Variable [batch_size, 1]
+            x: Variable [batch_size, 1]
+            y: Variable [batch_size, 1]
+
+        output: Variable [batch_size]
+        """
+
+        batch_size = k.size(0)
+
+        logpdf_k = dists.categorical_logpdf(
+            k,
+            categories=Variable(
+                torch.Tensor([2, 5]).unsqueeze(-1).unsqueeze(-1).expand(2, batch_size, 1)
+            ),
+            probabilities=Variable(
+                torch.Tensor([0.5, 0.5]).unsqueeze(-1).unsqueeze(-1).expand(2, batch_size, 1)
+            )
+        )
+
+        logpdf_x = dists.normal_logpdf(
+            x,
+            Variable(torch.zeros(x.size())), Variable(torch.ones(x.size()))
+        )
+
+        mean = self.f_approx(k, x)
+        var = Variable(torch.ones(mean.size()))
+        logpdf_y = dists.normal_logpdf(y, mean, var)
+
+        return (logpdf_k + logpdf_x + logpdf_y).squeeze(1)
 
     def sample(self, batch_size):
         """
@@ -243,7 +347,7 @@ class QuadraticGenerativeNetwork(model.GenerativeNetwork):
 ##########################
 
 
-class QuadraticInferenceNetwork(model.InferenceNetwork):
+class QuadraticInferenceNetworkForwardDependence(model.InferenceNetwork):
     """We seek to learn an inference network $q_{\phi}(k, x \lvert y)$ parameterized by $\phi$
 
     which, given $y$ maps to the parameters of the distribution over $(k, x)$, ideally close to the
@@ -262,7 +366,7 @@ class QuadraticInferenceNetwork(model.InferenceNetwork):
         Initialize inference network.
         """
 
-        super(QuadraticInferenceNetwork, self).__init__()
+        super(QuadraticInferenceNetworkForwardDependence, self).__init__()
         self.k_lin1 = nn.Linear(1, 16)
         self.k_lin2 = nn.Linear(16, 2)
 
@@ -350,7 +454,7 @@ class QuadraticInferenceNetwork(model.InferenceNetwork):
             var=var
         )
 
-        return (logpdf_k + logpdf_x).unsqueeze(1)
+        return (logpdf_k + logpdf_x).squeeze(1)
 
     def sample(self, y):
         """
@@ -372,6 +476,282 @@ class QuadraticInferenceNetwork(model.InferenceNetwork):
         )
 
         mean, var = self.get_q_x_params(Variable(k, volatile=True), Variable(y, volatile=True))
+        x = dists.normal_sample(
+            mean=mean.data,
+            var=var.data
+        )
+
+        return [k, x]
+
+
+class QuadraticInferenceNetworkReverseDependence(model.InferenceNetwork):
+    """We seek to learn an inference network $q_{\phi}(k, x \lvert y)$ parameterized by $\phi$
+
+    which, given $y$ maps to the parameters of the distribution over $(k, x)$, ideally close to the
+    posterior under the true model, $p(k, x \lvert y)$.
+
+    Let
+    \begin{align}
+        q_{\phi}(k, x \lvert y) &= q_{\phi}(k \lvert y) q_{\phi}(x \lvert k, y) \\\
+        q_{\phi}(x \lvert y) &= \mathrm{Normal}(\phi_1, \phi_2) \\\
+        q_{\phi}(k \lvert x, y) &= \mathrm{Categorical}([2, 5], [\phi_3, \phi_4])
+    \end{align}
+    where $\phi = [\phi_1, \dotsc, \phi_4]$ is the output of the inference network.
+    """
+    def __init__(self):
+        """
+        Initialize inference network.
+        """
+
+        super(QuadraticInferenceNetworkReverseDependence, self).__init__()
+        self.x_mean_lin1 = nn.Linear(1, 16)
+        self.x_mean_lin2 = nn.Linear(16, 1)
+
+        self.x_var_lin1 = nn.Linear(1, 16)
+        self.x_var_lin2 = nn.Linear(16, 1)
+
+        self.k_lin1 = nn.Linear(2, 16)
+        self.k_lin2 = nn.Linear(16, 2)
+
+        init.xavier_uniform(self.k_lin1.weight, gain=init.calculate_gain('relu'))
+        init.xavier_uniform(self.k_lin2.weight)
+        init.xavier_uniform(self.x_mean_lin1.weight, gain=init.calculate_gain('relu'))
+        init.xavier_uniform(self.x_mean_lin2.weight)
+        init.xavier_uniform(self.x_var_lin1.weight, gain=init.calculate_gain('relu'))
+        init.xavier_uniform(self.x_var_lin2.weight)
+
+    def get_q_x_params(self, y):
+        """
+        Returns parameters \phi_1, \phi_2.
+
+        input:
+            y: Variable [batch_size, 1]
+
+        output:
+            mean: Variable [batch_size, 1]
+            var: Variable [batch_size, 1]
+        """
+
+        mean = self.x_mean_lin1(y)
+        mean = F.relu(mean)
+        mean = self.x_mean_lin2(mean)
+
+        var = self.x_var_lin1(y)
+        var = F.relu(var)
+        var = self.x_var_lin2(var)
+        var = F.softplus(var)
+
+        return mean, var
+
+    def get_q_k_params(self, x, y):
+        """
+        Returns parameters \phi_1, \phi_2.
+
+        input:
+            x: Variable [batch_size, 1]
+            y: Variable [batch_size, 1]
+
+        output: Variable [batch_size, 2]
+        """
+
+        ret = self.k_lin1(torch.cat([x, y], dim=1))
+        ret = F.relu(ret)
+        ret = self.k_lin2(ret)
+        ret = F.softmax(ret)
+        ret = ret / torch.sum(ret, dim=1).expand_as(ret)
+
+        return ret
+
+    def forward(self, k, x, y):
+        """
+        Returns log q_{\phi}(k, x | y)
+
+        input:
+            k: Variable [batch_size, 1]
+            x: Variable [batch_size, 1]
+            y: Variable [batch_size, 1]
+
+        output: Variable [batch_size]
+        """
+        batch_size, _ = k.size()
+
+        mean, var = self.get_q_x_params(y)
+        logpdf_x = dists.normal_logpdf(
+            x,
+            mean=mean,
+            var=var
+        )
+
+        probabilities = self.get_q_k_params(x, y)
+        logpdf_k = dists.categorical_logpdf(
+            k,
+            categories=Variable(
+                torch.Tensor([2, 5]).unsqueeze(-1).unsqueeze(-1).expand(2, batch_size, 1)
+            ),
+            probabilities=torch.t(probabilities).unsqueeze(-1)
+        )
+
+        return (logpdf_k + logpdf_x).squeeze(1)
+
+    def sample(self, y):
+        """
+        Returns samples from q_{\phi}(k, x | y)
+
+        input:
+            y: Tensor [batch_size, 1]
+
+        output:
+            [k, x]: [Tensor [batch_size, 1], Tensor [batch_size, 1]]
+        """
+
+        batch_size = y.size(0)
+
+        mean, var = self.get_q_x_params(Variable(y, volatile=True))
+        x = dists.normal_sample(
+            mean=mean.data,
+            var=var.data
+        )
+
+        probabilities = self.get_q_k_params(
+            Variable(x, volatile=True),
+            Variable(y, volatile=True)
+        ).data
+        k = dists.categorical_sample(
+            categories=torch.Tensor([2, 5]).unsqueeze(-1).unsqueeze(-1).expand(2, batch_size, 1),
+            probabilities=torch.t(probabilities).unsqueeze(-1)
+        )
+
+        return [k, x]
+
+
+class QuadraticInferenceNetworkIndependent(model.InferenceNetwork):
+    """We seek to learn an inference network $q_{\phi}(k, x \lvert y)$ parameterized by $\phi$
+
+    which, given $y$ maps to the parameters of the distribution over $(k, x)$, ideally close to the
+    posterior under the true model, $p(k, x \lvert y)$.
+
+    Let
+    \begin{align}
+        q_{\phi}(k, x \lvert y) &= q_{\phi}(k \lvert y) q_{\phi}(x \lvert k, y) \\\
+        q_{\phi}(k \lvert y) &= \mathrm{Categorical}([2, 5], [\phi_1, \phi_2]) \\\
+        q_{\phi}(x \lvert y) &= \mathrm{Normal}(\phi_3, \phi_4)
+    \end{align}
+    where $\phi = [\phi_1, \dotsc, \phi_4]$ is the output of the inference network.
+    """
+    def __init__(self):
+        """
+        Initialize inference network.
+        """
+
+        super(QuadraticInferenceNetworkIndependent, self).__init__()
+        self.k_lin1 = nn.Linear(1, 16)
+        self.k_lin2 = nn.Linear(16, 2)
+
+        self.x_mean_lin1 = nn.Linear(1, 16)
+        self.x_mean_lin2 = nn.Linear(16, 1)
+
+        self.x_var_lin1 = nn.Linear(1, 16)
+        self.x_var_lin2 = nn.Linear(16, 1)
+
+        init.xavier_uniform(self.k_lin1.weight, gain=init.calculate_gain('relu'))
+        init.xavier_uniform(self.k_lin2.weight)
+        init.xavier_uniform(self.x_mean_lin1.weight, gain=init.calculate_gain('relu'))
+        init.xavier_uniform(self.x_mean_lin2.weight)
+        init.xavier_uniform(self.x_var_lin1.weight, gain=init.calculate_gain('relu'))
+        init.xavier_uniform(self.x_var_lin2.weight)
+
+    def get_q_k_params(self, y):
+        """
+        Returns parameters \phi_1, \phi_2.
+
+        input:
+            y: Variable [batch_size, 1]
+
+        output: Variable [batch_size, 2]
+        """
+
+        ret = self.k_lin1(y)
+        ret = F.relu(ret)
+        ret = self.k_lin2(ret)
+        ret = F.softmax(ret)
+        ret = ret / torch.sum(ret, dim=1).expand_as(ret)
+
+        return ret
+
+    def get_q_x_params(self, y):
+        """
+        Returns parameters \phi_3, \phi_4.
+
+        input:
+            y: Variable [batch_size, 1]
+
+        output:
+            mean: Variable [batch_size, 1]
+            var: Variable [batch_size, 1]
+        """
+
+        mean = self.x_mean_lin1(y)
+        mean = F.relu(mean)
+        mean = self.x_mean_lin2(mean)
+
+        var = self.x_var_lin1(y)
+        var = F.relu(var)
+        var = self.x_var_lin2(var)
+        var = F.softplus(var)
+
+        return mean, var
+
+    def forward(self, k, x, y):
+        """
+        Returns log q_{\phi}(k, x | y)
+
+        input:
+            k: Variable [batch_size, 1]
+            x: Variable [batch_size, 1]
+            y: Variable [batch_size, 1]
+
+        output: Variable [batch_size]
+        """
+        batch_size, _ = k.size()
+
+        probabilities = self.get_q_k_params(y)
+        logpdf_k = dists.categorical_logpdf(
+            k,
+            categories=Variable(
+                torch.Tensor([2, 5]).unsqueeze(-1).unsqueeze(-1).expand(2, batch_size, 1)
+            ),
+            probabilities=torch.t(probabilities).unsqueeze(-1)
+        )
+
+        mean, var = self.get_q_x_params(y)
+        logpdf_x = dists.normal_logpdf(
+            x,
+            mean=mean,
+            var=var
+        )
+
+        return (logpdf_k + logpdf_x).squeeze(1)
+
+    def sample(self, y):
+        """
+        Returns samples from q_{\phi}(k, x | y)
+
+        input:
+            y: Tensor [batch_size, 1]
+
+        output:
+            [k, x]: [Tensor [batch_size, 1], Tensor [batch_size, 1]]
+        """
+
+        batch_size = y.size(0)
+
+        probabilities = self.get_q_k_params(Variable(y, volatile=True)).data
+        k = dists.categorical_sample(
+            categories=torch.Tensor([2, 5]).unsqueeze(-1).unsqueeze(-1).expand(2, batch_size, 1),
+            probabilities=torch.t(probabilities).unsqueeze(-1)
+        )
+
+        mean, var = self.get_q_x_params(Variable(y, volatile=True))
         x = dists.normal_sample(
             mean=mean.data,
             var=var.data

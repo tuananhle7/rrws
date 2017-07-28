@@ -29,73 +29,91 @@ util.init(opt)
 
 # Initialize models
 generative_model = quadratic.QuadraticGenerativeModel(a=1, b=0, c=0)
-generative_network = quadratic.QuadraticGenerativeNetwork()
-inference_network = quadratic.QuadraticInferenceNetwork()
+generative_network_small = quadratic.QuadraticGenerativeNetworkSmall()
+generative_network_large = quadratic.QuadraticGenerativeNetworkLarge()
+inference_network_forward_dependence = quadratic.QuadraticInferenceNetworkForwardDependence()
+inference_network_reverse_dependence = quadratic.QuadraticInferenceNetworkReverseDependence()
+inference_network_independent = quadratic.QuadraticInferenceNetworkIndependent()
 
-# Plot test performance
-quadratic.plot_quadratic_generative_comparison(
-    generative_model,
-    generative_network,
-    num_data=1000,
-    filename='./figures/generative_start.pdf'
-)
+for generative_network, generative_network_name in zip(
+    [generative_network_large, generative_network_small], ['gen_large', 'gen_small']
+):
+    for inference_network, inference_network_name in zip(
+        [
+            inference_network_forward_dependence,
+            inference_network_reverse_dependence,
+            inference_network_independent
+        ],
+        ['inf_fwd', 'inf_rev', 'inf_ind']
+    ):
+        filename_prefix = generative_network_name + '_' + inference_network_name + '_'
 
-quadratic.plot_quadratic_comparison(
-    generative_model,
-    generative_network,
-    filename='./figures/quadratic_start.pdf'
-)
+        # Plot test performance
+        quadratic.plot_quadratic_generative_comparison(
+            generative_model,
+            generative_network,
+            num_data=1000,
+            filename='./figures/quadratic/{}generative_start.pdf'.format(filename_prefix)
+        )
 
-quadratic.plot_quadratic_inference_comparison(
-    generative_model,
-    inference_network,
-    num_inference_network_samples=1000,
-    num_importance_particles=1000,
-    y_test=25,
-    filename='./figures/inference_start.pdf'
-)
+        if generative_network_name == 'gen_small':
+            quadratic.plot_quadratic_comparison(
+                generative_model,
+                generative_network,
+                filename='./figures/quadratic/{}quadratic_start.pdf'.format(filename_prefix)
+            )
 
-# Training
-generative_network_objective,\
-    inference_network_objective,\
-    num_generative_epochs,\
-    num_inference_epochs = train.train_cdae(
-        generative_model,
-        generative_network,
-        inference_network,
-        num_iterations=opt.train_iterations,
-        batch_size=opt.train_batch_size,
-        num_data=opt.num_data,
-        generative_epochs_per_iteration=opt.generative_epochs_per_iteration,
-        inference_epochs_per_iteration=opt.inference_epochs_per_iteration
-    )
-train.plot_cdae_train(
-    generative_network_objective,
-    inference_network_objective,
-    num_generative_epochs,
-    num_inference_epochs,
-    filename='./figures/training.pdf'
-)
+        quadratic.plot_quadratic_inference_comparison(
+            generative_model,
+            inference_network,
+            num_inference_network_samples=1000,
+            num_importance_particles=1000,
+            y_test=25,
+            filename='./figures/quadratic/{}inference_start.pdf'.format(filename_prefix)
+        )
 
-# Test performance
-quadratic.plot_quadratic_generative_comparison(
-    generative_model,
-    generative_network,
-    num_data=1000,
-    filename='./figures/generative.pdf'
-)
+        # Training
+        generative_network_objective,\
+            inference_network_objective,\
+            num_generative_epochs,\
+            num_inference_epochs = train.train_cdae(
+                generative_model,
+                generative_network,
+                inference_network,
+                num_iterations=opt.train_iterations,
+                batch_size=opt.train_batch_size,
+                num_data=opt.num_data,
+                generative_epochs_per_iteration=opt.generative_epochs_per_iteration,
+                inference_epochs_per_iteration=opt.inference_epochs_per_iteration
+            )
+        train.plot_cdae_train(
+            generative_network_objective,
+            inference_network_objective,
+            num_generative_epochs,
+            num_inference_epochs,
+            filename='./figures/quadratic/{}training.pdf'.format(filename_prefix)
+        )
 
-quadratic.plot_quadratic_comparison(
-    generative_model,
-    generative_network,
-    filename='./figures/quadratic.pdf'
-)
+        # Test performance
+        quadratic.plot_quadratic_generative_comparison(
+            generative_model,
+            generative_network,
+            num_data=1000,
+            filename='./figures/quadratic/{}generative.pdf'.format(filename_prefix)
+        )
 
-quadratic.plot_quadratic_inference_comparison(
-    generative_model,
-    inference_network,
-    num_inference_network_samples=1000,
-    num_importance_particles=1000,
-    y_test=25,
-    filename='./figures/inference.pdf'
-)
+        if generative_network_name == 'gen_small':
+            quadratic.plot_quadratic_comparison(
+                generative_model,
+                generative_network,
+                filename='./figures/quadratic/{}quadratic.pdf'.format(filename_prefix)
+            )
+
+        quadratic.plot_quadratic_inference_comparison(
+            generative_model,
+            inference_network,
+            num_inference_network_samples=1000,
+            num_importance_particles=1000,
+            y_test=25,
+            filename='./figures/quadratic/{}inference.pdf'.format(filename_prefix)
+        )
