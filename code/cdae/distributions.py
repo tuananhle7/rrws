@@ -29,7 +29,7 @@ def normal_logpdf(x, mean, var):
     output: Tensor/Variable [dim_1, ..., dim_N]
     """
 
-    return -0.5 * (torch.pow(x - mean, 2) / var + torch.log(2 * var * np.pi))
+    return -0.5 * (torch.pow(x - mean, 2) / var + torch.log(2 * var * np.pi + util.epsilon))
 
 
 def categorical_sample(categories, probabilities):
@@ -37,10 +37,10 @@ def categorical_sample(categories, probabilities):
     Returns a Tensor of samples from Categorical(categories, probabilities)
 
     input:
-        categories: Tensor [num_categories, dim_1, ..., dim_N]
-        probabilities: Tensor [num_categories, dim_1, ..., dim_N]
+        categories: Tensor [num_categories, dim_1, ..., dim_N] (or [num_categories])
+        probabilities: Tensor [num_categories, dim_1, ..., dim_N] (or [num_categories])
 
-    output: Tensor [dim_1, ..., dim_N]
+    output: Tensor [dim_1, ..., dim_N] (or [1])
     """
 
     cat_size = categories.size()
@@ -56,30 +56,41 @@ def categorical_sample(categories, probabilities):
             p=probabilities_flattened[:, n].numpy()
         )
 
-    if util.cuda:
-        return torch.from_numpy(output_numpy_flattened).float().view(*output_size).cuda()
+    if len(output_size) == 0:
+        if util.cuda:
+            return torch.from_numpy(output_numpy_flattened).float().cuda()
+        else:
+            return torch.from_numpy(output_numpy_flattened).float()
     else:
-        return torch.from_numpy(output_numpy_flattened).float().view(*output_size)
+        if util.cuda:
+            return torch.from_numpy(output_numpy_flattened).float().view(*output_size).cuda()
+        else:
+            return torch.from_numpy(output_numpy_flattened).float().view(*output_size)
 
 
-def categorical_logpdf(x, categories, probabilities):
+def categorical_logpdf(value, categories, probabilities):
     """
-    Returns categorical logpdfs
+    Returns categorical logpdfs.
 
     input:
-        x: Tensor/Variable [dim_1, ..., dim_N]
-        categories: Tensor/Variable [num_categories, dim_1, ..., dim_N]
-        probabilities: Tensor/Variable [num_categories, dim_1, ..., dim_N]
+        value: Tensor/Variable [dim_1, ..., dim_N] (or [1])
+        categories: Tensor/Variable [num_categories, dim_1, ..., dim_N] (or [num_categories])
+        probabilities: Tensor/Variable [num_categories, dim_1, ..., dim_N] (or [num_categories])
 
-    output: Tensor/Variable [dim_1, ..., dim_N]
+    output: Tensor/Variable [dim_1, ..., dim_N] (or [1])
     """
 
-    num_categories = categories.size(0)
-    x_expanded = x.unsqueeze(0).expand_as(categories)
-    mask = (x_expanded == categories).float().cuda() if \
+    cat_size = categories.size()
+    num_categories, output_size = cat_size[0], cat_size[1:]
+
+    if len(output_size) == 0:
+        value_expanded = value.expand_as(categories)
+    else:
+        value_expanded = value.unsqueeze(0).expand_as(categories)
+    mask = (value_expanded == categories).float().cuda() if \
         util.cuda else \
-        (x_expanded == categories).float()
-    return torch.log(torch.sum(probabilities * mask, dim=0))
+        (value_expanded == categories).float()
+    return torch.log(torch.sum(probabilities * mask, dim=0) + util.epsilon)
 
 
 def gumbel_sample(location, scale):
@@ -93,7 +104,9 @@ def gumbel_sample(location, scale):
     output: Tensor [dim_1, ..., dim_N]
     """
 
-    return location - scale * torch.log(-torch.log(torch.rand(location.size())))
+    return location - scale * torch.log(
+        -torch.log(torch.rand(location.size() + util.epsilon)) + util.epsilon
+    )
 
 
 def gumbel_logpdf(value, location, scale):
@@ -110,7 +123,7 @@ def gumbel_logpdf(value, location, scale):
 
     temp = (value - location) / scale
 
-    return -(temp + torch.exp(-temp)) - torch.log(scale)
+    return -(temp + torch.exp(-temp)) - torch.log(scale + util.epsilon)
 
 
 def concrete_sample(location, temperature):
@@ -132,7 +145,7 @@ def concrete_sample(location, temperature):
         temperature_expanded = temperature.unsqueeze(0).expand_as(location)
     gumbels = gumbel_sample(torch.zeros(location.size()), torch.ones(location.size()))
 
-    numerator = torch.exp((torch.log(location) + gumbels) / temperature_expanded)
+    numerator = torch.exp((torch.log(location + util.epsilon) + gumbels) / temperature_expanded)
     denominator = torch.sum(numerator, dim=0).expand_as(numerator)
 
     return numerator / denominator
@@ -162,12 +175,88 @@ def concrete_logpdf(value, location, temperature):
         temperature_expanded = temperature.unsqueeze(0).expand_as(location)
 
     return torch.sum(torch.arange(1, num_categories)) + \
-        (num_categories - 1) * torch.log(temperature) + \
+        (num_categories - 1) * torch.log(temperature + util.epsilon) + \
         torch.sum(
-            torch.log(location) - (temperature_expanded + 1) * torch.log(value),
+            torch.log(
+                location + util.epsilon
+            ) - (temperature_expanded + 1) * torch.log(value + util.epsilon),
             dim=0
         ).squeeze(0) - \
         num_categories * torch.log(torch.sum(
             location * (value**(-temperature_expanded)),
             dim=0
-        ).squeeze(0))
+        ).squeeze(0) + util.epsilon)
+
+
+def discrete_sample(probabilities):
+    """
+    Returns a Tensor of samples from a Discrete(probabilities).
+
+    input:
+        probabilities: Tensor [num_categories, dim_1, ..., dim_N] (or [num_categories])
+
+    output: Tensor [dim_1, ..., dim_N] (or [1])
+    """
+
+    num_categories = probabilities.size(0)
+    categories = torch.arange(0, num_categories)
+    for n in range(probabilities.ndimension() - 1):
+        categories = categories.unsqueeze(-1)
+    categories = categories.expand_as(probabilities)
+
+    return categorical_sample(categories, probabilities)
+
+
+def discrete_logpdf(value, probabilities):
+    """
+    Returns Discrete logpdfs.
+
+    input:
+        value: Tensor/Variable [dim_1, ..., dim_N] (or [1])
+        probabilities: Tensor/Variable [num_categories, dim_1, ..., dim_N] (or [num_categories])
+
+    output: Tensor/Variable [dim_1, ..., dim_N] (or [1])
+    """
+
+    num_categories = probabilities.size(0)
+    categories = torch.arange(0, num_categories)
+    for n in range(probabilities.ndimension() - 1):
+        categories = categories.unsqueeze(-1)
+    categories = categories.expand_as(probabilities)
+    if isinstance(probabilities, Variable):
+        categories = Variable(categories)
+
+    return categorical_logpdf(value, categories, probabilities)
+
+
+def one_hot_discrete_sample(probabilities):
+    """
+    Returns a Tensor of samples from a Discrete(probabilities) in a one-hot form.
+
+    input:
+        probabilities: Tensor [num_categories, dim_1, ..., dim_N] (or [num_categories])
+
+    output: Tensor [num_categories, dim_1, ..., dim_N] (or [num_categories])
+    """
+
+    output = torch.zeros(probabilities.size())
+    d = discrete_sample(probabilities)
+
+    if probabilities.ndimension() == 1:
+        return output.scatter_(0, d.long(), 1)
+    else:
+        return output.scatter_(0, d.long().unsqueeze(0), 1)
+
+
+def one_hot_discrete_logpdf(value, probabilities):
+    """
+    Returns logpdfs of one-hot valued Discrete.
+
+    input:
+        value: Tensor/Variable [num_categories, dim_1, ..., dim_N] (or [num_categories])
+        probabilities: Tensor/Variable [num_categories, dim_1, ..., dim_N] (or [num_categories])
+
+    output: Tensor/Variable [dim_1, ..., dim_N] (or [1])
+    """
+
+    return torch.log(torch.sum(value * probabilities, dim=0) + util.epsilon).squeeze(0)
