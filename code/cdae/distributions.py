@@ -90,7 +90,7 @@ def categorical_logpdf(value, categories, probabilities):
     mask = (value_expanded == categories).float().cuda() if \
         util.cuda else \
         (value_expanded == categories).float()
-    return torch.log(torch.sum(probabilities * mask, dim=0) + util.epsilon)
+    return torch.log(torch.sum(probabilities * mask, dim=0).squeeze(0) + util.epsilon)
 
 
 def gumbel_sample(location, scale):
