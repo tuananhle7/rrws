@@ -26,7 +26,7 @@ def chunk(total, part):
 def init(opt):
     # Numerical issues
     global epsilon
-    epsilon = 1e-6
+    epsilon = 1e-20
 
     # Random seed
     torch.manual_seed(opt.seed)
