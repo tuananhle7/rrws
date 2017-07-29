@@ -176,12 +176,9 @@ def concrete_logpdf(value, location, temperature):
 
     return torch.sum(torch.arange(1, num_categories)) + \
         (num_categories - 1) * torch.log(temperature + util.epsilon) + \
-        torch.sum(
-            torch.log(
-                location + util.epsilon
-            ) - (temperature_expanded + 1) * torch.log(value + util.epsilon),
-            dim=0
-        ).squeeze(0) - \
+        torch.sum(torch.log(
+            location + util.epsilon
+        ) - (temperature_expanded + 1) * torch.log(value + util.epsilon), dim=0).squeeze(0) - \
         num_categories * torch.log(torch.sum(
             location * (value**(-temperature_expanded)),
             dim=0
