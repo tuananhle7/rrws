@@ -10,6 +10,20 @@ import torch.nn as nn
 import torch.distributions
 import torch.optim as optim
 
+epsilon = 1e-10
+
+
+def isnan(x):
+    if isinstance(x, Variable):
+        return np.isnan(torch.sum(x).data[0])
+    elif torch.is_tensor(x):
+        return np.isnan(torch.sum(x))
+    elif isinstance(x, nn.Module):
+        for param in x.parameters():
+            if isnan(param):
+                return True
+        return False
+
 
 class InferenceNetwork(nn.Module):
     def __init__(self, num_clusters_max, num_mixtures):
@@ -139,14 +153,14 @@ class InferenceNetwork(nn.Module):
 
         k_short_prob = self.get_k_params(obs_short)
         x_short_mean, x_short_std = self.get_x_params_from_obs_k(obs_short, k_short)
-        log_q_k_short = torch.gather(torch.log(k_short_prob), 1, k_short.long().unsqueeze(-1) - 1)
+        log_q_k_short = torch.gather(torch.log(k_short_prob + epsilon), 1, k_short.long().unsqueeze(-1) - 1)
         log_q_x_short = torch.distributions.Normal(x_short_mean, x_short_std).log_prob(x_short.unsqueeze(-1))
 
         k_long_prob = self.get_k_params(obs_long)
         z_long_prob = self.get_z_params_from_obs_k(obs_long, k_long)
         x_long_mean, x_long_std = self.get_x_params_from_obs_k_z(obs_long, k_long, z_long)
-        log_q_k_long = torch.gather(torch.log(k_long_prob), 1, k_long.long().unsqueeze(-1) - 1)
-        log_q_z_long = torch.gather(torch.log(z_long_prob), 1, z_long.long().unsqueeze(-1))
+        log_q_k_long = torch.gather(torch.log(k_long_prob + epsilon), 1, k_long.long().unsqueeze(-1) - 1)
+        log_q_z_long = torch.gather(torch.log(z_long_prob + epsilon), 1, z_long.long().unsqueeze(-1))
         log_q_x_long = torch.distributions.Normal(x_long_mean, x_long_std).log_prob(x_long.unsqueeze(-1))
         return -(torch.sum(log_q_k_short + log_q_x_short) + torch.sum(log_q_k_long + log_q_z_long + log_q_x_long)) / len(traces)
 
@@ -289,8 +303,8 @@ class GenerativeNetwork(nn.Module):
                     q_k_long_prob = inference_network.get_k_params(obs_long)
                     q_z_long_prob = inference_network.get_z_params_from_obs_k(obs_long, k_long)
                     q_x_long_mean, q_x_long_std = inference_network.get_x_params_from_obs_k_z(obs_long, k_long, z_long)
-                    log_q_k_long = torch.gather(torch.log(q_k_long_prob), 1, k_long.long().unsqueeze(-1) - 1).view(-1)
-                    log_q_z_long = torch.gather(torch.log(q_z_long_prob), 1, z_long.long().unsqueeze(-1)).view(-1)
+                    log_q_k_long = torch.gather(torch.log(q_k_long_prob + epsilon), 1, k_long.long().unsqueeze(-1) - 1).view(-1)
+                    log_q_z_long = torch.gather(torch.log(q_z_long_prob + epsilon), 1, z_long.long().unsqueeze(-1)).view(-1)
                     log_q_x_long = torch.distributions.Normal(q_x_long_mean, q_x_long_std).log_prob(x_long.unsqueeze(-1)).view(-1)
 
                     p_x_long_mean = torch.gather(
@@ -330,7 +344,7 @@ class GenerativeNetwork(nn.Module):
 
                     q_k_short_prob = inference_network.get_k_params(obs_short)
                     q_x_short_mean, q_x_short_std = inference_network.get_x_params_from_obs_k(obs_short, k_short)
-                    log_q_k_short = torch.gather(torch.log(q_k_short_prob), 1, k_short.long().unsqueeze(-1) - 1).view(-1)
+                    log_q_k_short = torch.gather(torch.log(q_k_short_prob + epsilon), 1, k_short.long().unsqueeze(-1) - 1).view(-1)
                     log_q_x_short = torch.distributions.Normal(q_x_short_mean, q_x_short_std).log_prob(x_short.unsqueeze(-1)).view(-1)
 
                     log_p_k_short = torch.gather(
@@ -382,16 +396,28 @@ def train_cdae(
         phi_optimizer.load_state_dict(resume_phi_optimizer_state_dict)
         start_iteration = resume_iteration
 
+    # print('phi_optimizer.state_dict() = {}'.format(phi_optimizer.state_dict()))
+    # print(inference_network.obs_to_k_params.modules())
+    # print('obs_to_k_params parameters:')
+    # for idx, (name, module) in enumerate(inference_network.obs_to_k_params.named_modules()):
+    #     # print(idx, '->', (name, module))
+    #     if isinstance(module, nn.Linear):
+    #         print('{}\'s weight = {}'.format(name, module.weight.data.numpy()))
+    #         print('{}\'s bias = {}'.format(name, module.bias.data.numpy()))
+    # input()
+
     for i in range(start_iteration, num_iterations):
         for theta_idx in range(num_theta_iterations):
             traces = generate_traces(num_traces, num_clusters_probs, mean_1, std_1, mixture_probs, means_2, stds_2, obs_std, generate_obs=True)
             obs = [trace[-1] for trace in traces]
+            theta_optimizer.zero_grad()
             loss = generative_network(obs, num_particles, inference_network)
             loss.backward()
             theta_optimizer.step()
             theta_loss_history[i, theta_idx] = loss.data[0]
         for phi_idx in range(num_phi_iterations):
             traces = generative_network.get_traces(num_traces)
+            phi_optimizer.zero_grad()
             loss = inference_network(traces)
             loss.backward()
             phi_optimizer.step()
@@ -443,7 +469,7 @@ def main():
     num_theta_iterations = 1
     num_phi_iterations = 1
     num_traces = 100
-    num_particles = 10
+    num_particles = 1
     learning_rate = 0.001
 
     if args.resume:

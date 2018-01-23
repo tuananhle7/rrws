@@ -10,6 +10,8 @@ import torch.nn as nn
 import torch.distributions
 import torch.optim as optim
 
+epsilon = 1e-10
+
 
 class GenerativeNetwork(nn.Module):
     def __init__(self, num_clusters_probs, init_mean_1, std_1, mixture_probs, init_means_2, stds_2, obs_std):
@@ -149,8 +151,8 @@ class GenerativeNetwork(nn.Module):
                     q_k_long_prob = inference_network.get_k_params(obs_long)
                     q_z_long_prob = inference_network.get_z_params_from_obs_k(obs_long, k_long)
                     q_x_long_mean, q_x_long_std = inference_network.get_x_params_from_obs_k_z(obs_long, k_long, z_long)
-                    log_q_k_long = torch.gather(torch.log(q_k_long_prob), 1, k_long.long().unsqueeze(-1) - 1).view(-1)
-                    log_q_z_long = torch.gather(torch.log(q_z_long_prob), 1, z_long.long().unsqueeze(-1)).view(-1)
+                    log_q_k_long = torch.gather(torch.log(q_k_long_prob + epsilon), 1, k_long.long().unsqueeze(-1) - 1).view(-1)
+                    log_q_z_long = torch.gather(torch.log(q_z_long_prob + epsilon), 1, z_long.long().unsqueeze(-1)).view(-1)
                     log_q_x_long = torch.distributions.Normal(q_x_long_mean, q_x_long_std).log_prob(x_long.unsqueeze(-1)).view(-1)
 
                     p_x_long_mean = torch.gather(
@@ -190,7 +192,7 @@ class GenerativeNetwork(nn.Module):
 
                     q_k_short_prob = inference_network.get_k_params(obs_short)
                     q_x_short_mean, q_x_short_std = inference_network.get_x_params_from_obs_k(obs_short, k_short)
-                    log_q_k_short = torch.gather(torch.log(q_k_short_prob), 1, k_short.long().unsqueeze(-1) - 1).view(-1)
+                    log_q_k_short = torch.gather(torch.log(q_k_short_prob + epsilon), 1, k_short.long().unsqueeze(-1) - 1).view(-1)
                     log_q_x_short = torch.distributions.Normal(q_x_short_mean, q_x_short_std).log_prob(x_short.unsqueeze(-1)).view(-1)
 
                     log_p_k_short = torch.gather(
@@ -239,6 +241,7 @@ def train_iwae_from_prior(
     for i in range(start_iteration, num_iterations):
         traces = generate_traces(num_traces, num_clusters_probs, mean_1, std_1, mixture_probs, means_2, stds_2, obs_std, generate_obs=True)
         obs = [trace[-1] for trace in traces]
+        optimizer.zero_grad()
         loss = generative_network(obs, num_particles, None, True)
         loss.backward()
         optimizer.step()
