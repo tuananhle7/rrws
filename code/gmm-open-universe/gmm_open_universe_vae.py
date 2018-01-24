@@ -249,12 +249,12 @@ def train_vae(
             torch.save(optimizer.state_dict(), 'vae_optimizer.pt')
             print('VAE saved for iteration {}'.format(i))
 
-    np.save('vae_iteration.npy', i + 1)
+    np.save('vae_iteration.npy', num_iterations)
     np.save('vae_mean_1_history.npy', mean_1_history)
     np.save('vae_loss_history.npy', loss_history)
     torch.save(vae.state_dict(), 'vae.pt')
     torch.save(optimizer.state_dict(), 'vae_optimizer.pt')
-    print('VAE saved for iteration {}'.format(i))
+    print('VAE saved for iteration {}'.format(num_iterations - 1))
 
     return loss_history, vae, mean_1_history
 
@@ -274,7 +274,7 @@ def main():
     obs_std = 1
 
     # VAE
-    num_iterations = 10000
+    num_iterations = 15000
     num_traces = 100
     learning_rate = 0.001
 
@@ -379,7 +379,7 @@ def main():
     for test_obs_idx, test_obs in enumerate(test_obss):
         k_prior_pdf, z_prior_pdf, x_prior_pdf = get_prior_pdf(x_points, num_prior_samples, num_clusters_probs, mean_1, std_1, mixture_probs, means_2, stds_2, obs_std)
         k_posterior_pdf, z_posterior_pdf, x_posterior_pdf = get_posterior_pdf(x_points, num_posterior_samples, test_obs, num_clusters_probs, mean_1, std_1, mixture_probs, means_2, stds_2, obs_std)
-        k_qp_pdf, z_qp_pdf, x_qp_pdf = vae.get_pdf(x_points, test_obs, num_inference_network_samples)
+        k_vae_pdf, z_vae_pdf, x_vae_pdf = vae.get_pdf(x_points, test_obs, num_inference_network_samples)
 
         i = 0
         axs[0][test_obs_idx].bar(k_points + 0.5 * bar_width * (2 * i + 1 - num_barplots), k_prior_pdf, width=bar_width, color='lightgray', edgecolor='lightgray', fill=True, label='prior')
@@ -388,7 +388,7 @@ def main():
         axs[0][test_obs_idx].bar(k_points + 0.5 * bar_width * (2 * i + 1 - num_barplots), k_posterior_pdf, width=bar_width, color='black', edgecolor='black', fill=True, label='posterior')
 
         i = 2
-        axs[0][test_obs_idx].bar(k_points + 0.5 * bar_width * (2 * i + 1 - num_barplots), k_qp_pdf, width=bar_width, color='black', fill=False, linestyle='dashed', label='inference network')
+        axs[0][test_obs_idx].bar(k_points + 0.5 * bar_width * (2 * i + 1 - num_barplots), k_vae_pdf, width=bar_width, color='black', fill=False, linestyle='dashed', label='inference network')
 
 
         axs[0][test_obs_idx].set_xticks(k_points)
@@ -403,7 +403,7 @@ def main():
         axs[1][test_obs_idx].bar(z_points + 0.5 * bar_width * (2 * i + 1 - num_barplots), z_posterior_pdf, width=bar_width, color='black', edgecolor='black', fill=True, label='posterior')
 
         i = 2
-        axs[1][test_obs_idx].bar(z_points + 0.5 * bar_width * (2 * i + 1 - num_barplots), z_qp_pdf, width=bar_width, color='black', fill=False, linestyle='dashed', label='inference network')
+        axs[1][test_obs_idx].bar(z_points + 0.5 * bar_width * (2 * i + 1 - num_barplots), z_vae_pdf, width=bar_width, color='black', fill=False, linestyle='dashed', label='inference network')
 
 
         axs[1][test_obs_idx].set_xticks(z_points)
@@ -413,13 +413,14 @@ def main():
 
         axs[2][test_obs_idx].plot(x_points, x_prior_pdf, color='lightgray', label='prior')
         axs[2][test_obs_idx].plot(x_points, x_posterior_pdf, color='black', label='posterior')
-        axs[2][test_obs_idx].plot(x_points, x_qp_pdf, color='black', linestyle='dashed', label='inference network')
+        axs[2][test_obs_idx].plot(x_points, x_vae_pdf, color='black', linestyle='dashed', label='inference network')
         axs[2][test_obs_idx].scatter(x=test_obs, y=0, color='black', label='test obs', marker='x')
 
         axs[2][test_obs_idx].set_yticks([])
         axs[2][0].set_ylabel('x')
 
     axs[-1][test_obs_idx // 2].legend(loc='upper center', bbox_to_anchor=(0.5, -0.35), ncol=5, fontsize='small')
+    axs[1][2].remove()
 
     fig.tight_layout()
 

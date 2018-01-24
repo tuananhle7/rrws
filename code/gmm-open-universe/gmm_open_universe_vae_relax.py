@@ -26,9 +26,9 @@ def conditional_reparam(v, theta, b, epsilon=1e-6):
         return -torch.log(v / ((1 - v) * theta) + 1 + epsilon)
 
 
-class VAE(nn.Module):
+class VAERelax(nn.Module):
     def __init__(self, num_clusters_probs, init_mean_1, std_1, mixture_probs, means_2, stds_2, obs_std):
-        super(VAE, self).__init__()
+        super(VAERelax, self).__init__()
         # Generative network parameters
         self.num_clusters_max = len(num_clusters_probs)
         self.num_mixtures = len(mixture_probs)
@@ -298,7 +298,7 @@ class VAE(nn.Module):
         return loss
 
 
-def train_vae(
+def train_vae_relax(
     num_clusters_probs, mean_1, std_1, mixture_probs, means_2, stds_2, obs_std,
     num_iterations, num_traces, learning_rate,
     resume=False, resume_iteration=None, resume_mean_1_history=None,
@@ -308,7 +308,7 @@ def train_vae(
     mean_1_history = np.zeros([num_iterations])
     loss_history = np.zeros([num_iterations])
     init_mean_1 = np.random.normal(2, 0.1)
-    vae = VAE(num_clusters_probs, init_mean_1, std_1, mixture_probs, means_2, stds_2, obs_std)
+    vae = VAERelax(num_clusters_probs, init_mean_1, std_1, mixture_probs, means_2, stds_2, obs_std)
     num_parameters = sum([len(p) for p in vae.parameters()])
     optimizer = optim.Adam(vae.generative_network_params + vae.inference_network_params, lr=learning_rate)
     control_variate_optimizer = optim.Adam(vae.control_variate_params, lr=learning_rate)
@@ -349,16 +349,16 @@ def train_vae(
             np.save('vae_relax_iteration.npy', i + 1)
             np.save('vae_relax_mean_1_history.npy', mean_1_history)
             np.save('vae_relax_loss_history.npy', loss_history)
-            torch.save(vae.state_dict(), 'vae.pt')
-            torch.save(optimizer.state_dict(), 'vae_optimizer.pt')
+            torch.save(vae.state_dict(), 'vae_relax.pt')
+            torch.save(optimizer.state_dict(), 'vae_relax_optimizer.pt')
             print('VAE_Relax saved for iteration {}'.format(i))
 
-    np.save('vae_relax_iteration.npy', i + 1)
+    np.save('vae_relax_iteration.npy', num_iterations)
     np.save('vae_relax_mean_1_history.npy', mean_1_history)
     np.save('vae_relax_loss_history.npy', loss_history)
-    torch.save(vae.state_dict(), 'vae.pt')
-    torch.save(optimizer.state_dict(), 'vae_optimizer.pt')
-    print('VAE_Relax saved for iteration {}'.format(i))
+    torch.save(vae.state_dict(), 'vae_relax.pt')
+    torch.save(optimizer.state_dict(), 'vae_relax_optimizer.pt')
+    print('VAE_Relax saved for iteration {}'.format(num_iterations - 1))
 
     return loss_history, vae, mean_1_history
 
@@ -378,7 +378,7 @@ def main():
     obs_std = 1
 
     # VAE
-    num_iterations = 10000
+    num_iterations = 15000
     num_traces = 100
     learning_rate = 0.001
 
@@ -403,7 +403,7 @@ def main():
         vae_optimizer_state_dict = torch.load(filename)
         print('Loaded from {}'.format(filename))
 
-        vae_loss_history, vae, vae_mean_1_history = train_vae(
+        vae_loss_history, vae, vae_mean_1_history = train_vae_relax(
             num_clusters_probs, mean_1, std_1, mixture_probs, means_2, stds_2, obs_std,
             num_iterations, num_traces, learning_rate,
             resume=True,
@@ -414,7 +414,7 @@ def main():
             resume_optimizer_state_dict=vae_optimizer_state_dict
         )
     else:
-        vae_loss_history, vae, vae_mean_1_history = train_vae(
+        vae_loss_history, vae, vae_mean_1_history = train_vae_relax(
             num_clusters_probs, mean_1, std_1, mixture_probs, means_2, stds_2, obs_std,
             num_iterations, num_traces, learning_rate
         )
@@ -524,6 +524,7 @@ def main():
         axs[2][0].set_ylabel('x')
 
     axs[-1][test_obs_idx // 2].legend(loc='upper center', bbox_to_anchor=(0.5, -0.35), ncol=5, fontsize='small')
+    axs[1][2].remove()
 
     fig.tight_layout()
 
