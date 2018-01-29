@@ -15,7 +15,7 @@ class GenerativeNetworkL1(nn.Module):
         self.train_observation_bias = train_observation_bias
 
     def is_cuda(self):
-        next(self.parameters()).is_cuda
+        return next(self.parameters()).is_cuda
 
     def get_latent_params(self):
         return torch.exp(-F.softplus(-self.latent_pre_nonlinearity_params))
@@ -74,7 +74,7 @@ class InferenceNetworkL1(nn.Module):
         self.train_observation_mean = train_observation_mean
 
     def is_cuda(self):
-        next(self.parameters()).is_cuda
+        return next(self.parameters()).is_cuda
 
     def get_latent_params(self, observation):
         return torch.exp(-F.softplus(-self.lin1(observation - self.train_observation_mean)))
@@ -118,7 +118,7 @@ class RelaxControlVariateL1(nn.Module):
         self.train_observation_mean = train_observation_mean
 
     def is_cuda(self):
-        next(self.parameters()).is_cuda
+        return next(self.parameters()).is_cuda
 
     def forward(self, aux_latent, observation, generative_network, inference_network):
         relaxed_latent = continuous_relaxation(aux_latent, torch.exp(self.log_temperature)) * 2 - 1
@@ -141,7 +141,7 @@ class VAEL1(nn.Module):
             self.control_variate = RelaxControlVariateL1(train_observation_mean)
 
     def is_cuda(self):
-        next(self.parameters()).is_cuda
+        return next(self.parameters()).is_cuda
 
     def forward(self, observation, num_particles=1):
         if num_particles > 1:

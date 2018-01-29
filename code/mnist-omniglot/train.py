@@ -302,6 +302,9 @@ def main():
         if args.architecture == 'L1':
             generative_network = GenerativeNetworkL1(train_observation_bias)
             inference_network = InferenceNetworkL1(train_observation_mean)
+            if cuda:
+                generative_network.cuda()
+                inference_network.cuda()
 
             theta_optimizer = torch.optim.Adam(generative_network.parameters())
             phi_optimizer = torch.optim.Adam(inference_network.parameters())
