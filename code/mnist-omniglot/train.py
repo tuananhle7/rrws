@@ -23,7 +23,7 @@ plt.rc('legend', fontsize=SMALL_SIZE)    # legend fontsize
 plt.rc('figure', titlesize=BIGGER_SIZE)  # fontsize of the figure title
 
 
-def train_vae(vae, optimizer, train_dataloader, valid_data, num_epochs, num_valid_particles):
+def train_vae(vae, optimizer, train_dataloader, valid_dataloader, num_epochs, num_valid_particles):
     train_elbo_history = np.zeros([num_epochs])
     valid_elbo_history = np.zeros([num_epochs])
     train_start_time = datetime.datetime.now()
@@ -36,11 +36,12 @@ def train_vae(vae, optimizer, train_dataloader, valid_data, num_epochs, num_vali
 
             train_elbo_history[epoch_idx] += torch.sum(train_elbo).data[0] / len(train_dataloader.dataset)
 
-        valid_elbo_history[epoch_idx] = torch.mean(vae.generative_network.elbo(
-            Variable(valid_data),
-            vae.inference_network,
-            num_particles=num_valid_particles
-        )).data[0]
+        for observation in iter(valid_dataloader):
+            valid_elbo_history[epoch_idx] += torch.sum(vae.generative_network.elbo(
+                Variable(observation),
+                vae.inference_network,
+                num_particles=num_valid_particles
+            )).data[0] / len(valid_dataloader.dataset)
 
         if epoch_idx % 10 == 0:
             estimated_remaining_time = (datetime.datetime.now() - train_start_time) / (epoch_idx + 1) * (num_epochs - (epoch_idx + 1))
@@ -54,7 +55,7 @@ def train_vae(vae, optimizer, train_dataloader, valid_data, num_epochs, num_vali
     return train_elbo_history, valid_elbo_history, vae, optimizer
 
 
-def train_vae_relax(vae, vae_optimizer, control_variate_optimizer, train_dataloader, valid_data, num_epochs, num_valid_particles):
+def train_vae_relax(vae, vae_optimizer, control_variate_optimizer, train_dataloader, valid_dataloader, num_epochs, num_valid_particles):
     train_elbo_history = np.zeros([num_epochs])
     valid_elbo_history = np.zeros([num_epochs])
 
@@ -79,11 +80,12 @@ def train_vae_relax(vae, vae_optimizer, control_variate_optimizer, train_dataloa
 
             train_elbo_history[epoch_idx] += torch.sum(train_elbo).data[0] / len(train_dataloader.dataset)
 
-        valid_elbo_history[epoch_idx] = torch.mean(vae.generative_network.elbo(
-            Variable(valid_data),
-            vae.inference_network,
-            num_particles=num_valid_particles
-        )).data[0]
+        for observation in iter(valid_dataloader):
+            valid_elbo_history[epoch_idx] += torch.sum(vae.generative_network.elbo(
+                Variable(observation),
+                vae.inference_network,
+                num_particles=num_valid_particles
+            )).data[0] / len(valid_dataloader.dataset)
 
         if epoch_idx % 10 == 0:
             estimated_remaining_time = (datetime.datetime.now() - train_start_time) / (epoch_idx + 1) * (num_epochs - (epoch_idx + 1))
@@ -97,7 +99,7 @@ def train_vae_relax(vae, vae_optimizer, control_variate_optimizer, train_dataloa
     return train_elbo_history, valid_elbo_history, vae, vae_optimizer, control_variate_optimizer
 
 
-def train_cdae(generative_network, inference_network, theta_optimizer, phi_optimizer, num_theta_train_particles, train_dataloader, valid_data, num_epochs, num_valid_particles):
+def train_cdae(generative_network, inference_network, theta_optimizer, phi_optimizer, num_theta_train_particles, train_dataloader, valid_dataloader, num_epochs, num_valid_particles):
     train_theta_loss_history = np.zeros([num_epochs])
     train_phi_loss_history = np.zeros([num_epochs])
     valid_elbo_history = np.zeros([num_epochs])
@@ -121,11 +123,12 @@ def train_cdae(generative_network, inference_network, theta_optimizer, phi_optim
             phi_optimizer.step()
             train_phi_loss_history[epoch_idx] += torch.sum(loss).data[0] / len(train_dataloader.dataset)
 
-        valid_elbo_history[epoch_idx] = torch.mean(generative_network.elbo(
-            Variable(valid_data),
-            inference_network,
-            num_particles=num_valid_particles
-        )).data[0]
+        for observation in iter(valid_dataloader):
+            valid_elbo_history[epoch_idx] += torch.sum(generative_network.elbo(
+                Variable(observation),
+                inference_network,
+                num_particles=num_valid_particles
+            )).data[0] / len(valid_dataloader.dataset)
 
         if epoch_idx % 10 == 0:
             estimated_remaining_time = (datetime.datetime.now() - train_start_time) / (epoch_idx + 1) * (num_epochs - (epoch_idx + 1))
@@ -187,6 +190,7 @@ def main():
     batch_size = 24
     num_valid_particles = 100
     train_observation_dataloader = torch.utils.data.DataLoader(train_observation, batch_size=batch_size, shuffle=True)
+    valid_observation_dataloader = torch.utils.data.DataLoader(valid_observation, batch_size=batch_size, shuffle=False)
     if args.estimator == 'reinforce':
         if args.architecture == 'L1':
             vae = VAEL1(args.estimator, train_observation_mean, train_observation_bias)
@@ -197,7 +201,7 @@ def main():
                 vae,
                 vae_optimizer,
                 train_observation_dataloader,
-                valid_observation,
+                valid_observation_dataloader,
                 num_epochs,
                 num_valid_particles
             )
@@ -252,7 +256,7 @@ def main():
                 vae_optimizer,
                 control_variate_optimizer,
                 train_observation_dataloader,
-                valid_observation,
+                valid_observation_dataloader,
                 num_epochs,
                 num_valid_particles
             )
@@ -317,7 +321,7 @@ def main():
                 phi_optimizer,
                 num_theta_train_particles,
                 train_observation_dataloader,
-                valid_observation,
+                valid_observation_dataloader,
                 num_epochs,
                 num_valid_particles
             )
