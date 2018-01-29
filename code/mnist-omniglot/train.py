@@ -186,7 +186,7 @@ def main():
     train_observation_bias = torch.log(1 / torch.clamp(train_observation_mean, 0.001, 0.999) - 1.)
 
     # Train
-    num_epochs = 2000000
+    num_epochs = 2000
     batch_size = 24
     num_valid_particles = 100
     train_observation_dataloader = torch.utils.data.DataLoader(train_observation, batch_size=batch_size, shuffle=True)
