@@ -9,9 +9,11 @@ import scipy.io
 import urllib.request
 
 BINARIZED_MNIST_URL = 'http://www.cs.toronto.edu/~larocheh/public/datasets/binarized_mnist'
-BINARIZED_MNIST_DATA_DIR = '/Users/tuananhle/Documents/research/datasets/binarized-mnist'
+# BINARIZED_MNIST_DATA_DIR = '/Users/tuananhle/Documents/research/datasets/binarized-mnist'
+BINARIZED_MNIST_DATA_DIR = '/homes/48/tuananh/datasets/binarized-mnist'
 OMNIGLOT_URL = 'https://github.com/yburda/iwae/raw/master/datasets/OMNIGLOT/chardata.mat'
-OMNIGLOT_DATA_FILE = '/Users/tuananhle/Documents/research/datasets/omniglot/omniglot.mat'
+# OMNIGLOT_DATA_FILE = '/Users/tuananhle/Documents/research/datasets/omniglot/omniglot.mat'
+OMNIGLOT_DATA_FILE = '/homes/48/tuananh/datasets/omniglot/omniglot.mat'
 
 
 def download_binarized_mnist(
