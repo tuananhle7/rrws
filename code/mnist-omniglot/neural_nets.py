@@ -14,6 +14,9 @@ class GenerativeNetworkL1(nn.Module):
         self.lin1 = nn.Linear(200, 784)
         self.train_observation_bias = train_observation_bias
 
+    def is_cuda(self):
+        next(self.parameters()).is_cuda
+
     def get_latent_params(self):
         return torch.exp(-F.softplus(-self.latent_pre_nonlinearity_params))
 
@@ -70,6 +73,9 @@ class InferenceNetworkL1(nn.Module):
         self.lin1 = nn.Linear(784, 200)
         self.train_observation_mean = train_observation_mean
 
+    def is_cuda(self):
+        next(self.parameters()).is_cuda
+
     def get_latent_params(self, observation):
         return torch.exp(-F.softplus(-self.lin1(observation - self.train_observation_mean)))
 
@@ -86,8 +92,8 @@ class InferenceNetworkL1(nn.Module):
 
     def sample_latent_aux(self, observation):
         latent_params = self.get_latent_params(observation)
-        u = Variable(torch.rand(200))
-        v = Variable(torch.rand(200))
+        u = Variable(torch.rand(200).cuda() if self.is_cuda() else torch.rand(200))
+        v = Variable(torch.rand(200).cuda() if self.is_cuda() else torch.rand(200))
         aux_latent = reparam(u, latent_params) # z
         latent = heaviside(aux_latent).float().detach() # b
         aux_latent_tilde = conditional_reparam(v, latent_params, latent) # z_tilde
@@ -111,6 +117,9 @@ class RelaxControlVariateL1(nn.Module):
         )
         self.train_observation_mean = train_observation_mean
 
+    def is_cuda(self):
+        next(self.parameters()).is_cuda
+
     def forward(self, aux_latent, observation, generative_network, inference_network):
         relaxed_latent = continuous_relaxation(aux_latent, torch.exp(self.log_temperature)) * 2 - 1
         relaxed_elbo = generative_network.get_joint_log_density(relaxed_latent, observation) - \
@@ -130,6 +139,9 @@ class VAEL1(nn.Module):
         self.estimator = estimator
         if self.estimator == 'relax':
             self.control_variate = RelaxControlVariateL1(train_observation_mean)
+
+    def is_cuda(self):
+        next(self.parameters()).is_cuda
 
     def forward(self, observation, num_particles=1):
         if num_particles > 1:
