@@ -16,11 +16,12 @@ BIGGER_SIZE = 11
 
 plt.rc('font', size=SMALL_SIZE)          # controls default text sizes
 plt.rc('axes', titlesize=SMALL_SIZE)     # fontsize of the axes title
-plt.rc('axes', labelsize=SMALL_SIZE)    # fontsize of the x and y labels
+plt.rc('axes', labelsize=SMALL_SIZE)     # fontsize of the x and y labels
 plt.rc('xtick', labelsize=SMALL_SIZE)    # fontsize of the tick labels
 plt.rc('ytick', labelsize=SMALL_SIZE)    # fontsize of the tick labels
 plt.rc('legend', fontsize=SMALL_SIZE)    # legend fontsize
 plt.rc('figure', titlesize=BIGGER_SIZE)  # fontsize of the figure title
+plt.switch_backend('agg')
 
 
 def train_vae(vae, optimizer, train_dataloader, valid_dataloader, num_epochs, num_valid_particles):
@@ -186,29 +187,38 @@ def main():
     train_observation_bias = -torch.log(1 / torch.clamp(train_observation_mean, 0.001, 0.999) - 1.)
 
     # Train
-    num_epochs = 2000
+    if args.dataset == 'mnist':
+        num_epochs = 1000
+    elif args.dataset == 'omniglot':
+        num_epochs = 2000
     batch_size = 24
     num_valid_particles = 100
+
+    # num_epochs = 100
+    # batch_size = 2
+    # num_valid_particles = 10
+
     train_observation_dataloader = torch.utils.data.DataLoader(train_observation, batch_size=batch_size, shuffle=True)
     valid_observation_dataloader = torch.utils.data.DataLoader(valid_observation, batch_size=batch_size, shuffle=False)
     if args.estimator == 'reinforce':
         if args.architecture == 'L1':
             vae = VAEL1(args.estimator, train_observation_mean, train_observation_bias)
-            if cuda:
-                vae.cuda()
-            vae_optimizer = torch.optim.Adam(vae.parameters())
-            train_elbo_history, valid_elbo_history, vae, vae_optimizer = train_vae(
-                vae,
-                vae_optimizer,
-                train_observation_dataloader,
-                valid_observation_dataloader,
-                num_epochs,
-                num_valid_particles
-            )
         elif args.architecture == 'L2':
             raise NotImplementedError
         elif args.architecture == 'NL':
-            raise NotImplementedError
+            vae = VAENL(args.estimator, train_observation_mean, train_observation_bias)
+
+        if cuda:
+            vae.cuda()
+        vae_optimizer = torch.optim.Adam(vae.parameters())
+        train_elbo_history, valid_elbo_history, vae, vae_optimizer = train_vae(
+            vae,
+            vae_optimizer,
+            train_observation_dataloader,
+            valid_observation_dataloader,
+            num_epochs,
+            num_valid_particles
+        )
 
         filename = '{}_{}_{}_train_elbo_history.npy'.format(args.dataset, args.estimator, args.architecture)
         np.save(filename, train_elbo_history)
@@ -246,24 +256,25 @@ def main():
     elif args.estimator == 'relax':
         if args.architecture == 'L1':
             vae = VAEL1(args.estimator, train_observation_mean, train_observation_bias)
-            if cuda:
-                vae.cuda()
-            vae_optimizer = torch.optim.Adam(vae.vae_params)
-            control_variate_optimizer = torch.optim.Adam(vae.control_variate.parameters())
-
-            train_elbo_history, valid_elbo_history, vae, vae_optimizer, control_variate_optimizer = train_vae_relax(
-                vae,
-                vae_optimizer,
-                control_variate_optimizer,
-                train_observation_dataloader,
-                valid_observation_dataloader,
-                num_epochs,
-                num_valid_particles
-            )
         elif args.architecture == 'L2':
             raise NotImplementedError
         elif args.architecture == 'NL':
-            raise NotImplementedError
+            vae = VAENL(args.estimator, train_observation_mean, train_observation_bias)
+
+        if cuda:
+            vae.cuda()
+        vae_optimizer = torch.optim.Adam(vae.vae_params)
+        control_variate_optimizer = torch.optim.Adam(vae.control_variate.parameters())
+
+        train_elbo_history, valid_elbo_history, vae, vae_optimizer, control_variate_optimizer = train_vae_relax(
+            vae,
+            vae_optimizer,
+            control_variate_optimizer,
+            train_observation_dataloader,
+            valid_observation_dataloader,
+            num_epochs,
+            num_valid_particles
+        )
 
         filename = '{}_{}_{}_train_elbo_history.npy'.format(args.dataset, args.estimator, args.architecture)
         np.save(filename, train_elbo_history)
@@ -306,29 +317,30 @@ def main():
         if args.architecture == 'L1':
             generative_network = GenerativeNetworkL1(train_observation_bias)
             inference_network = InferenceNetworkL1(train_observation_mean)
-            if cuda:
-                generative_network.cuda()
-                inference_network.cuda()
-
-            theta_optimizer = torch.optim.Adam(generative_network.parameters())
-            phi_optimizer = torch.optim.Adam(inference_network.parameters())
-            num_theta_train_particles = 1
-
-            train_theta_loss_history, train_phi_loss_history, valid_elbo_history, generative_network, inference_network, theta_optimizer, phi_optimizer = train_cdae(
-                generative_network,
-                inference_network,
-                theta_optimizer,
-                phi_optimizer,
-                num_theta_train_particles,
-                train_observation_dataloader,
-                valid_observation_dataloader,
-                num_epochs,
-                num_valid_particles
-            )
         elif args.architecture == 'L2':
             raise NotImplementedError
         elif args.architecture == 'NL':
-            raise NotImplementedError
+            generative_network = GenerativeNetworkNL(train_observation_bias)
+            inference_network = InferenceNetworkNL(train_observation_mean)
+
+        if cuda:
+            generative_network.cuda()
+            inference_network.cuda()
+        theta_optimizer = torch.optim.Adam(generative_network.parameters())
+        phi_optimizer = torch.optim.Adam(inference_network.parameters())
+        num_theta_train_particles = 1
+
+        train_theta_loss_history, train_phi_loss_history, valid_elbo_history, generative_network, inference_network, theta_optimizer, phi_optimizer = train_cdae(
+            generative_network,
+            inference_network,
+            theta_optimizer,
+            phi_optimizer,
+            num_theta_train_particles,
+            train_observation_dataloader,
+            valid_observation_dataloader,
+            num_epochs,
+            num_valid_particles
+        )
 
         filename = '{}_{}_{}_train_theta_loss_history.npy'.format(args.dataset, args.estimator, args.architecture)
         np.save(filename, train_theta_loss_history)
