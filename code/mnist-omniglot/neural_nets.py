@@ -20,20 +20,26 @@ class GenerativeNetworkL1(nn.Module):
     def get_latent_params(self):
         return torch.exp(-softplus(-self.latent_pre_nonlinearity_params))
 
+    def get_latent_logalpha(self):
+        return self.latent_pre_nonlinearity_params
+
     def get_latent_log_density(self, latent):
-        latent_params = self.get_latent_params().unsqueeze(0).expand_as(latent)
+        latent_logalpha = self.get_latent_logalpha().unsqueeze(0).expand_as(latent)
         return torch.sum(
-            torch.distributions.Bernoulli(latent_params).log_prob((latent + 1) / 2),
+            bernoulli_logprob((latent + 1) / 2, latent_logalpha),
             dim=1
         )
 
     def get_observation_params(self, latent):
         return torch.exp(-softplus(-(self.lin1(latent) + self.train_observation_bias)))
 
+    def get_observation_logalpha(self, latent):
+        return self.lin1(latent) + self.train_observation_bias
+
     def get_observation_log_density(self, latent, observation):
-        observation_params = self.get_observation_params(latent)
+        observation_logalpha = self.get_observation_logalpha(latent)
         return torch.sum(
-            torch.distributions.Bernoulli(observation_params).log_prob(observation),
+            bernoulli_logprob(observation, observation_logalpha),
             dim=1
         )
 
@@ -79,10 +85,13 @@ class InferenceNetworkL1(nn.Module):
     def get_latent_params(self, observation):
         return torch.exp(-softplus(-self.lin1(observation - self.train_observation_mean)))
 
+    def get_latent_logalpha(self, observation):
+        return self.lin1(observation - self.train_observation_mean)
+
     def get_latent_log_density(self, observation, latent):
-        latent_params = self.get_latent_params(observation)
+        latent_logalpha = self.get_latent_logalpha(observation)
         return torch.sum(
-            torch.distributions.Bernoulli(latent_params).log_prob((latent + 1) / 2),
+            bernoulli_logprob((latent + 1) / 2, latent_logalpha),
             dim=1
         )
 

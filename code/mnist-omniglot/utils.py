@@ -17,6 +17,11 @@ def softplus(x):
     return m + torch.log(torch.exp(-m) + torch.exp(x - m))
 
 
+# Copied from https://github.com/duvenaud/relax/blob/master/rebar_tf.py#L36
+def bernoulli_logprob(b, log_alpha):
+    return b * (-softplus(-log_alpha)) + (1 - b) * (-log_alpha - softplus(-log_alpha))
+
+
 def logsumexp(values, dim=0, keepdim=False):
     """Logsumexp of a Tensor/Variable.
 
