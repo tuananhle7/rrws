@@ -183,7 +183,7 @@ def main():
         torch.from_numpy(np.mean(train_observation_numpy, axis=0, keepdims=True)).float().cuda() if cuda else
         torch.from_numpy(np.mean(train_observation_numpy, axis=0, keepdims=True)).float()
     )
-    train_observation_bias = torch.log(1 / torch.clamp(train_observation_mean, 0.001, 0.999) - 1.)
+    train_observation_bias = -torch.log(1 / torch.clamp(train_observation_mean, 0.001, 0.999) - 1.)
 
     # Train
     num_epochs = 2000
