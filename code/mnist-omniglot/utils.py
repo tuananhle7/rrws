@@ -78,6 +78,6 @@ def conditional_reparam(v, theta, b, epsilon=1e-8):
 
     # NB: This implementation is inefficient but should be correct
     return (
-        safe_log(v / ((1 - v) * (1 - theta)) + 1) * (b == 1).float() +
-        (-safe_log(v / ((1 - v) * theta) + 1)) * (b == 0).float()
+        safe_log(v / ((1 - v) * (1 - theta)) + 1) * b +
+        (-safe_log(v / ((1 - v) * theta) + 1)) * (1 - b)
     )
