@@ -1,6 +1,10 @@
 import torch
 
 
+def safe_log(x, epsilon=1e-8):
+    return torch.log(torch.clamp(x, min=epsilon))
+
+
 def logsumexp(values, dim=0, keepdim=False):
     """Logsumexp of a Tensor/Variable.
 
@@ -33,7 +37,7 @@ def heaviside(x):
 
 
 def reparam(u, theta, epsilon=1e-8):
-    return torch.log(theta + epsilon) - torch.log(1 - theta + epsilon) + torch.log(u + epsilon) - torch.log(1 - u + epsilon)
+    return safe_log(theta) - safe_log(1 - theta) + safe_log(u) - safe_log(1 - u)
 
 
 def conditional_reparam(v, theta, b, epsilon=1e-8):
@@ -57,6 +61,6 @@ def conditional_reparam(v, theta, b, epsilon=1e-8):
 
     # NB: This implementation is inefficient but should be correct
     return (
-        torch.log(v / ((1 - v) * (1 - theta)) + 1 + epsilon) * (b == 1).float() +
-        (-torch.log(v / ((1 - v) * theta) + 1 + epsilon)) * (b == 0).float()
+        safe_log(v / ((1 - v) * (1 - theta)) + 1) * (b == 1).float() +
+        (-safe_log(v / ((1 - v) * theta) + 1)) * (b == 0).float()
     )
