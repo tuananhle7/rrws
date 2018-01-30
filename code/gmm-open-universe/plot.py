@@ -237,8 +237,38 @@ def main():
     for ax in axs:
         ax.spines['top'].set_visible(False)
         ax.spines['right'].set_visible(False)
+        ax.grid(True, linestyle='dashed', axis='y', alpha=0.5)
 
     filename = 'gmm_open_universe_model_param_and_loss.pdf'
+    fig.savefig(filename, bbox_inches='tight')
+    print('Saved to {}'.format(filename))
+
+    # Plot losses and model params 2
+    fig, axs = plt.subplots(3, 1, sharex=True)
+    fig.set_size_inches(3.25, 2.5)
+
+    axs[0].plot(cdae_mean_1_history, color='black', label='wake-sleep')
+    axs[0].plot(vae_mean_1_history, color='gray', label='vae')
+    axs[0].plot(vae_relax_mean_1_history, color='lightgray', label='relax')
+    axs[0].axhline(mean_1, color='black', linestyle='dashed', label='true')
+    axs[0].legend(ncol=2, frameon=False)
+    axs[0].set_ylabel('$\mu_{1, 1}$')
+
+    axs[1].plot(cdae_phi_loss_history, color='black', label='wake-sleep')
+    axs[1].set_ylabel('w-s $\phi$ loss')
+    axs[2].plot(cdae_theta_loss_history, color='black', label='wake-sleep')
+    axs[2].plot(vae_loss_history, color='gray', label='vae')
+    axs[2].plot(vae_relax_loss_history, color='lightgray', label='relax')
+    axs[2].set_ylabel('-ELBO\n(w-s $\\theta$ loss)')
+    # axs[2].legend(ncol=3, frameon=False, bbox_to_anchor=(0.5, -0.4), loc='upper center')
+    # axs[2].legend(ncol=3, frameon=False)
+
+    axs[-1].set_xlabel('Iteration')
+    for ax in axs:
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+
+    filename = 'gmm_open_universe_model_param_and_loss_2.pdf'
     fig.savefig(filename, bbox_inches='tight')
     print('Saved to {}'.format(filename))
 

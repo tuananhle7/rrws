@@ -15,15 +15,34 @@ def heaviside(x):
     return x >= 0
 
 
-def reparam(u, theta, epsilon=1e-6):
+def reparam(u, theta, epsilon=1e-10):
     return torch.log(theta + epsilon) - torch.log(1 - theta + epsilon) + torch.log(u + epsilon) - torch.log(1 - u + epsilon)
 
 
-def conditional_reparam(v, theta, b, epsilon=1e-6):
-    if b.data[0] == 1:
-        return torch.log(v / ((1 - v) * (1 - theta)) + 1 + epsilon)
-    else:
-        return -torch.log(v / ((1 - v) * theta) + 1 + epsilon)
+def conditional_reparam(v, theta, b, epsilon=1e-10):
+    # NB: This is a buggy implementation that performs the best
+    # if b.data[0] == 1:
+    #     return torch.log(v / ((1 - v) * (1 - theta)) + 1 + epsilon)
+    # else:
+    #     return -torch.log(v / ((1 - v) * theta) + 1 + epsilon)
+
+    # NB: This implementation gives "Segmentation Fault 11"
+    # result = Variable(torch.zeros(*b.size()))
+    # for i in range(2):
+    #     v_i = v[b.data == i]
+    #     theta_i = theta[b.data == i]
+    #     if i == 1:
+    #         result[b.data == i] = torch.log(v_i / ((1 - v_i) * (1 - theta_i)) + 1 + epsilon)
+    #     else:
+    #         result[b.data == i] = -torch.log(v_i / ((1 - v_i) * theta_i) + 1 + epsilon)
+    #
+    # return result
+
+    # NB: This implementation is inefficient but should be correct
+    return (
+        torch.log(v / ((1 - v) * (1 - theta)) + 1 + epsilon) * (b == 1).float() +
+        (-torch.log(v / ((1 - v) * theta) + 1 + epsilon)) * (b == 0).float()
+    )
 
 
 class VAERelax(nn.Module):
@@ -102,7 +121,7 @@ class VAERelax(nn.Module):
             nn.Linear(16, 16),
             nn.Tanh(),
             nn.Linear(16, 1),
-            nn.Tanh()
+            nn.ReLU()
         )
         self.control_variate_z = nn.Sequential(
             nn.Linear(2, 16),
@@ -110,7 +129,7 @@ class VAERelax(nn.Module):
             nn.Linear(16, 16),
             nn.Tanh(),
             nn.Linear(16, 1),
-            nn.Tanh()
+            nn.ReLU()
         )
         self.control_variate_params = list(self.control_variate_k.parameters()) + list(self.control_variate_z.parameters())
 
@@ -194,6 +213,7 @@ class VAERelax(nn.Module):
         aux_k_long, aux_k_short, aux_k_tilde_long, aux_k_tilde_short = aux_k[k == 2], aux_k[k == 1], aux_k_tilde[k == 2], aux_k_tilde[k == 1]
         log_q_k = torch.log(torch.gather(k_prob, 1, k.long().unsqueeze(-1) - 1)).view(-1)
         loss = Variable(torch.Tensor([0]))
+        elbo = Variable(torch.Tensor([0]))
 
         if len(obs_long) > 0:
             # long traces
@@ -261,6 +281,8 @@ class VAERelax(nn.Module):
                 (control_variate_k_tilde_long + control_variate_z_tilde_long)
             ) / len(obs)
 
+            elbo = elbo + torch.sum(long_elbo) / num_samples
+
         if len(obs_short) > 0:
             # short traces
             x_short_mean, x_short_std = self.get_x_params_from_obs_k(obs_short, k_short)
@@ -295,7 +317,9 @@ class VAERelax(nn.Module):
                 control_variate_k_tilde_short
             ) / len(obs)
 
-        return loss
+            elbo = elbo + torch.sum(short_elbo) / num_samples
+
+        return loss, elbo
 
 
 def train_vae_relax(
@@ -309,7 +333,7 @@ def train_vae_relax(
     loss_history = np.zeros([num_iterations])
     init_mean_1 = np.random.normal(2, 0.1)
     vae = VAERelax(num_clusters_probs, init_mean_1, std_1, mixture_probs, means_2, stds_2, obs_std)
-    num_parameters = sum([len(p) for p in vae.parameters()])
+    num_parameters = sum([len(p) for p in vae.generative_network_params] + [len(p) for p in vae.inference_network_params])
     optimizer = optim.Adam(vae.generative_network_params + vae.inference_network_params, lr=learning_rate)
     control_variate_optimizer = optim.Adam(vae.control_variate_params, lr=learning_rate)
     start_iteration = 0
@@ -327,10 +351,10 @@ def train_vae_relax(
         # Optimizer
         optimizer.zero_grad()
         obs = Variable(torch.Tensor([trace[-1] for trace in traces]))
-        loss = vae(obs)
+        loss, elbo = vae(obs)
         loss.backward(create_graph=True)
 
-        two_loss_grad_detached = [2 * p.grad.detach() / num_parameters for p in vae.generative_network_params] + [p.grad.detach() for p in vae.inference_network_params]
+        two_loss_grad_detached = [2 * p.grad.detach() / num_parameters for p in vae.generative_network_params] + [2 * p.grad.detach() / num_parameters for p in vae.inference_network_params]
 
         optimizer.step()
 
@@ -340,7 +364,7 @@ def train_vae_relax(
         torch.autograd.backward(loss_grad, two_loss_grad_detached)
         control_variate_optimizer.step()
 
-        loss_history[i] = loss.data[0]
+        loss_history[i] = -elbo.data[0]
         mean_1_history[i] = vae.mean_1.data[0]
         if i % 10 == 0:
             print('iteration {}'.format(i))

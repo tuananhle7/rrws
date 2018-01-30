@@ -132,11 +132,13 @@ class VAE(nn.Module):
         return get_pdf_from_traces(traces, range(1, 1 + self.num_clusters_max), range(self.num_mixtures), x_points)
 
     def forward(self, obs):
+        num_samples = len(obs)
         k_prob = self.get_k_params(obs)
         k = torch.multinomial(k_prob, 1, True).view(-1) + 1
         obs_long, obs_short, k_long, k_short = obs[k == 2], obs[k == 1], k[k == 2], k[k == 1]
         log_q_k = torch.log(torch.gather(k_prob, 1, k.unsqueeze(-1) - 1)).view(-1)
         loss = Variable(torch.Tensor([0]))
+        elbo = Variable(torch.Tensor([0]))
 
         if len(obs_long) > 0:
             # long traces
@@ -179,6 +181,7 @@ class VAE(nn.Module):
             long_elbo = log_prior_k_long + log_prior_z_long + log_prior_x_long + log_lik_long - log_q_k_long - log_q_z_long - log_q_x_long
 
             loss = loss - torch.sum(long_elbo + long_elbo.detach() * (log_q_k_long + log_q_z_long)) / len(obs)
+            elbo = elbo + torch.sum(long_elbo) / num_samples
 
         if len(obs_short) > 0:
             # short traces
@@ -202,8 +205,9 @@ class VAE(nn.Module):
             short_elbo = log_prior_k_short + log_prior_x_short + log_lik_short - log_q_k_short - log_q_x_short
 
             loss = loss - torch.sum(short_elbo + short_elbo.detach() * log_q_k_short) / len(obs)
+            elbo = elbo + torch.sum(short_elbo) / num_samples
 
-        return loss
+        return loss, elbo
 
 
 def train_vae(
@@ -231,12 +235,12 @@ def train_vae(
 
         optimizer.zero_grad()
         obs = Variable(torch.Tensor([trace[-1] for trace in traces]))
-        loss = vae(obs)
+        loss, elbo = vae(obs)
 
         loss.backward()
         optimizer.step()
 
-        loss_history[i] = loss.data[0]
+        loss_history[i] = -elbo.data[0]
         mean_1_history[i] = vae.mean_1.data[0]
         if i % 10 == 0:
             print('iteration {}'.format(i))
