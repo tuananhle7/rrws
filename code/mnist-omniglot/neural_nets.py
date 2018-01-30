@@ -63,8 +63,8 @@ class GenerativeNetworkL1(nn.Module):
         return logsumexp(log_weights, dim=1) - np.log(num_particles)
 
     def forward(self, observation, inference_network, num_theta_train_particles):
-        elbo = self.elbo(observation, inference_network, num_theta_train_particles)
-        return -torch.mean(elbo), elbo
+        elbo_ = self.elbo(observation, inference_network, num_theta_train_particles)
+        return -torch.mean(elbo_), elbo_
 
 
 class InferenceNetworkL1(nn.Module):
