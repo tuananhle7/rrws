@@ -24,7 +24,7 @@ def logsumexp(values, dim=0, keepdim=False):
     return result if keepdim else result.squeeze(dim)
 
 
-def continuous_relaxation(z, temperature, epsilon=1e-10):
+def continuous_relaxation(z, temperature, epsilon=1e-8):
     return 1 / (1 + torch.exp(-z / (temperature + epsilon)))
 
 
@@ -32,11 +32,11 @@ def heaviside(x):
     return x >= 0
 
 
-def reparam(u, theta, epsilon=1e-10):
+def reparam(u, theta, epsilon=1e-8):
     return torch.log(theta + epsilon) - torch.log(1 - theta + epsilon) + torch.log(u + epsilon) - torch.log(1 - u + epsilon)
 
 
-def conditional_reparam(v, theta, b, epsilon=1e-10):
+def conditional_reparam(v, theta, b, epsilon=1e-8):
     # NB: This is a buggy implementation that performs the best
     # if b.data[0] == 1:
     #     return torch.log(v / ((1 - v) * (1 - theta)) + 1 + epsilon)
