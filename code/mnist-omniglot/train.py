@@ -318,7 +318,8 @@ def main():
             generative_network = GenerativeNetworkL1(train_observation_bias)
             inference_network = InferenceNetworkL1(train_observation_mean)
         elif args.architecture == 'L2':
-            raise NotImplementedError
+            generative_network = GenerativeNetworkL2(train_observation_bias)
+            inference_network = InferenceNetworkL2(train_observation_mean)
         elif args.architecture == 'NL':
             generative_network = GenerativeNetworkNL(train_observation_bias)
             inference_network = InferenceNetworkNL(train_observation_mean)
