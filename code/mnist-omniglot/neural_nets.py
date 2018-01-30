@@ -28,7 +28,7 @@ class GenerativeNetworkL1(nn.Module):
         )
 
     def get_observation_params(self, latent):
-        return torch.exp(-F.softplus(-self.lin1(latent)))
+        return torch.exp(-F.softplus(-(self.lin1(latent) + self.train_observation_bias)))
 
     def get_observation_log_density(self, latent, observation):
         observation_params = self.get_observation_params(latent)
