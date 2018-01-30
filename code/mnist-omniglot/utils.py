@@ -5,6 +5,18 @@ def safe_log(x, epsilon=1e-8):
     return torch.log(torch.clamp(x, min=epsilon))
 
 
+# Copied from https://github.com/duvenaud/relax/blob/master/rebar_tf.py#L23
+def softplus(x):
+    '''
+    Let m = max(0, x), then,
+    sofplus(x) = log(1 + e(x)) = log(e(0) + e(x)) = log(e(m)(e(-m) + e(x-m)))
+                         = m + log(e(-m) + e(x - m))
+    The term inside of the log is guaranteed to be between 1 and 2.
+    '''
+    m = torch.clamp(x, min=0)
+    return m + torch.log(torch.exp(-m) + torch.exp(x - m))
+
+
 def logsumexp(values, dim=0, keepdim=False):
     """Logsumexp of a Tensor/Variable.
 

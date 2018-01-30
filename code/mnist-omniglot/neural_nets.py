@@ -18,7 +18,7 @@ class GenerativeNetworkL1(nn.Module):
         return next(self.parameters()).is_cuda
 
     def get_latent_params(self):
-        return torch.exp(-F.softplus(-self.latent_pre_nonlinearity_params))
+        return torch.exp(-softplus(-self.latent_pre_nonlinearity_params))
 
     def get_latent_log_density(self, latent):
         latent_params = self.get_latent_params().unsqueeze(0).expand_as(latent)
@@ -28,7 +28,7 @@ class GenerativeNetworkL1(nn.Module):
         )
 
     def get_observation_params(self, latent):
-        return torch.exp(-F.softplus(-(self.lin1(latent) + self.train_observation_bias)))
+        return torch.exp(-softplus(-(self.lin1(latent) + self.train_observation_bias)))
 
     def get_observation_log_density(self, latent, observation):
         observation_params = self.get_observation_params(latent)
@@ -77,7 +77,7 @@ class InferenceNetworkL1(nn.Module):
         return next(self.parameters()).is_cuda
 
     def get_latent_params(self, observation):
-        return torch.exp(-F.softplus(-self.lin1(observation - self.train_observation_mean)))
+        return torch.exp(-softplus(-self.lin1(observation - self.train_observation_mean)))
 
     def get_latent_log_density(self, observation, latent):
         latent_params = self.get_latent_params(observation)
