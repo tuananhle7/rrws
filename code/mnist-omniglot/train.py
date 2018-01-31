@@ -149,7 +149,7 @@ def main():
     parser.add_argument('--cuda', action='store_true')
     parser.add_argument('--dataset', help='one of mnist, omniglot')
     parser.add_argument('--estimator', help='one of reinforce, relax, cdae')
-    parser.add_argument('--relax-lr', help='Adam learning rate for RELAX', type=float, default=0.001)
+    parser.add_argument('--relax-lr', help='Adam learning rate for RELAX', type=float, default=0.0005)
     parser.add_argument('--relax-c-lr-scale', help='Scaling factor for the learning rate for the control variate in RELAX', type=float, default=10)
     parser.add_argument('--relax-c-weight-decay', help='Weight decay for the control variate in RELAX', type=float, default=0.001)
     parser.add_argument('--cdae-lr', help='Adam learning rate for CDAE', type=float, default=0.0001)
