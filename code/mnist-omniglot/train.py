@@ -100,7 +100,7 @@ def train_vae_relax(vae, vae_optimizer, control_variate_optimizer, train_dataloa
     return train_elbo_history, valid_elbo_history, vae, vae_optimizer, control_variate_optimizer
 
 
-def train_cdae(generative_network, inference_network, theta_optimizer, phi_optimizer, num_theta_train_particles, train_dataloader, valid_dataloader, num_epochs, num_valid_particles):
+def train_cdae(generative_network, inference_network, theta_optimizer, phi_optimizer, num_theta_train_particles, train_dataloader, valid_dataloader, num_epochs, num_valid_particles, num_theta_updates=1, num_phi_updates=1):
     train_theta_loss_history = np.zeros([num_epochs])
     train_phi_loss_history = np.zeros([num_epochs])
     valid_elbo_history = np.zeros([num_epochs])
@@ -109,19 +109,21 @@ def train_cdae(generative_network, inference_network, theta_optimizer, phi_optim
     for epoch_idx in range(num_epochs):
         for observation in iter(train_dataloader):
             # Train generative network (theta)
-            theta_optimizer.zero_grad()
-            loss, train_elbo = generative_network(Variable(observation), inference_network, num_theta_train_particles)
-            loss.backward()
-            theta_optimizer.step()
+            for _ in range(num_theta_updates):
+                theta_optimizer.zero_grad()
+                loss, train_elbo = generative_network(Variable(observation), inference_network, num_theta_train_particles)
+                loss.backward()
+                theta_optimizer.step()
             train_theta_loss_history[epoch_idx] += torch.sum(-train_elbo).data[0] / len(train_dataloader.dataset)
 
             # Train inference network (phi)
             batch_size = observation.size(0)
-            generated_latent, generated_observation = generative_network.sample(batch_size)
-            phi_optimizer.zero_grad()
-            loss = inference_network(generated_latent, generated_observation)
-            loss.backward()
-            phi_optimizer.step()
+            for _ in range(num_phi_updates):
+                generated_latent, generated_observation = generative_network.sample(batch_size)
+                phi_optimizer.zero_grad()
+                loss = inference_network(generated_latent, generated_observation)
+                loss.backward()
+                phi_optimizer.step()
             train_phi_loss_history[epoch_idx] += torch.sum(loss).data[0] / len(train_dataloader.dataset)
 
         for observation in iter(valid_dataloader):
@@ -153,6 +155,8 @@ def main():
     parser.add_argument('--relax-c-lr-scale', help='Scaling factor for the learning rate for the control variate in RELAX', type=float, default=10)
     parser.add_argument('--relax-c-weight-decay', help='Weight decay for the control variate in RELAX', type=float, default=0.001)
     parser.add_argument('--cdae-lr', help='Adam learning rate for CDAE', type=float, default=0.0001)
+    parser.add_argument('--cdae-num-phi-updates', type=int, default=1)
+    parser.add_argument('--cdae-num-theta-updates', type=int, default=1)
     parser.add_argument('--architecture', help='one of L1, L2, NL')
     args = parser.parse_args()
 
@@ -352,7 +356,9 @@ def main():
             train_observation_dataloader,
             valid_observation_dataloader,
             num_epochs,
-            num_valid_particles
+            num_valid_particles,
+            args.num_theta_updates,
+            args.num_phi_updates
         )
 
         filename = '{}_{}_{}_train_theta_loss_history.npy'.format(args.dataset, args.estimator, args.architecture)
