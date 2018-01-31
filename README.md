@@ -26,4 +26,10 @@ In `code/mnist-omniglot`, run
 python train.py --help
 ```
 
-to see instructions to train the generative and inference networks.
+to see instructions to train the generative and inference networks. Then run
+
+```
+python plot.py
+```
+
+to obtain plots.
