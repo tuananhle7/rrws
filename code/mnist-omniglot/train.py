@@ -357,8 +357,8 @@ def main():
             valid_observation_dataloader,
             num_epochs,
             num_valid_particles,
-            args.num_theta_updates,
-            args.num_phi_updates
+            args.cdae_num_theta_updates,
+            args.cdae_num_phi_updates
         )
 
         filename = '{}_{}_{}_train_theta_loss_history.npy'.format(args.dataset, args.estimator, args.architecture)
