@@ -1,7 +1,7 @@
 import torch
 
 
-def safe_log(x, epsilon=1e-8):
+def safe_log(x, epsilon=1e-6):
     return torch.log(torch.clamp(x, min=epsilon))
 
 
