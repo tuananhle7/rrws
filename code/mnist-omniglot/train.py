@@ -149,9 +149,10 @@ def main():
     parser.add_argument('--cuda', action='store_true')
     parser.add_argument('--dataset', help='one of mnist, omniglot')
     parser.add_argument('--estimator', help='one of reinforce, relax, cdae')
-    parser.add_argument('--lr', help='Adam learning rate', type=float, default=0.001)
+    parser.add_argument('--relax-lr', help='Adam learning rate for RELAX', type=float, default=0.001)
     parser.add_argument('--relax-c-lr-scale', help='Scaling factor for the learning rate for the control variate in RELAX', type=float, default=10)
     parser.add_argument('--relax-c-weight-decay', help='Weight decay for the control variate in RELAX', type=float, default=0.001)
+    parser.add_argument('--cdae-lr', help='Adam learning rate for CDAE', type=float, default=0.0001)
     parser.add_argument('--architecture', help='one of L1, L2, NL')
     args = parser.parse_args()
 
@@ -213,7 +214,7 @@ def main():
 
         if cuda:
             vae.cuda()
-        vae_optimizer = torch.optim.Adam(vae.parameters(), lr=args.lr)
+        vae_optimizer = torch.optim.Adam(vae.parameters())
         train_elbo_history, valid_elbo_history, vae, vae_optimizer = train_vae(
             vae,
             vae_optimizer,
@@ -268,11 +269,11 @@ def main():
             vae.cuda()
         vae_optimizer = torch.optim.Adam(
             vae.vae_params,
-            lr=args.lr
+            lr=args.relax_lr
         )
         control_variate_optimizer = torch.optim.Adam(
             vae.control_variate.parameters(),
-            lr=args.lr * args.relax_c_lr_scale,
+            lr=args.relax_lr * args.relax_c_lr_scale,
             betas=(0.9, 0.99999),
             weight_decay=args.relax_c_weight_decay
         )
@@ -338,8 +339,8 @@ def main():
         if cuda:
             generative_network.cuda()
             inference_network.cuda()
-        theta_optimizer = torch.optim.Adam(generative_network.parameters(), lr=args.lr)
-        phi_optimizer = torch.optim.Adam(inference_network.parameters(), lr=args.lr)
+        theta_optimizer = torch.optim.Adam(generative_network.parameters(), lr=args.cdae_lr)
+        phi_optimizer = torch.optim.Adam(inference_network.parameters(), lr=args.cdae_lr)
         num_theta_train_particles = 1
 
         train_theta_loss_history, train_phi_loss_history, valid_elbo_history, generative_network, inference_network, theta_optimizer, phi_optimizer = train_cdae(
