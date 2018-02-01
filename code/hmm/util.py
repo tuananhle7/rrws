@@ -37,7 +37,7 @@ def generate_from_prior(
     observations = np.zeros([num_samples, num_timesteps])
 
     for sample_idx in range(num_samples):
-        obs, lat = my_hmm.sample(n=num_timesteps)
+        obs, lat = my_hmm.sample(num_timesteps)
         latent_states[sample_idx, :] = lat.reshape(-1)
         observations[sample_idx, :] = obs.reshape(-1)
 
