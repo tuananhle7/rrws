@@ -34,7 +34,7 @@ python plot.py
 
 to obtain plots.
 
-## Hidden Markov Models
+## Hidden Markov Model
 
 Dependencies:
 - https://github.com/hmmlearn/hmmlearn
