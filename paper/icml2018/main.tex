@@ -135,8 +135,8 @@ Given a time series $y_{1:T}$ where $y_t \in \mathbb R^{d_y}$ and $y_t^{\text{po
         \item For $f$ in $\{1, \dotsc, F\}$:
         \begin{align}
             a_{t, f} &\sim \mathrm{Categorical}(\pi_{a_{t - 1, f}}^a(s_{t, f})) \\
-            x_{t, f} &\sim \mathrm{Normal}(\pi_{a_{t - 1, f}}^x, \Sigma_x) \\
-            s_{t, f} &\sim \mathrm{Normal}(\pi_{a_{t - 1, f}}^s, \Sigma_s) \\
+            x_{t, f} &\sim \mathrm{Normal}(\pi_{a_{t - 1, f}}^x(s_{t, f}), \Sigma_x) \\
+            s_{t, f} &\sim \mathrm{Normal}(\pi_{a_{t - 1, f}}^s(s_{t, f}, x_{t, f}), \Sigma_s) \\
             y_{t, f}^{\text{pos}} &\sim \mathrm{Normal}(x_{t, f}, \Sigma_{\text{pos}}) \\
             \mathrm{Enc}(f, y_{t, 1:F}) &\sim \prod_{k = 1}^K \mathrm{Bernoulli}(\eta_k(s_{t, f}))
         \end{align}
