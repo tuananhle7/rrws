@@ -66,7 +66,7 @@
 \maketitle
 
 \section{Annealed Weights}
-Given unnormalized weights $(w_k)_{k = 1}^K$, let the expected sample size with annealing parameter $\alpha$ be:
+Given unnormalized weights $(w_k)_{k = 1}^K$, let the expected sample size with annealing parameter $\alpha \in [0, 1]$ be:
 \begin{align}
     \mathrm{ESS}(\alpha) := \frac{\left(\sum_{k = 1}^K w_k^\alpha\right)^2}{\sum_{k = 1}^K w_k^{2 \alpha}}.
 \end{align}
@@ -96,6 +96,6 @@ This is because the second term in the numerator in \eqref{eq:ess-derivative} ca
 Since $w_i^\alpha w_j^\alpha > 0$, $(\log w_i - \log w_j) > 0$ and $(w_j - w_i) < 0$, \eqref{eq:sum} is $< 0$.
 If all weights are equal, there are no terms in the sum in \eqref{eq:sum} and \eqref{eq:sum} $= 0$.
 Hence $\frac{\partial \mathrm{ESS}(\alpha)}{\partial \alpha} \leq 0$ with equality holding if all weights are equal.
-This means that all weights are equal, $\mathrm{ESS}(\alpha) = K$, otherwise $\mathrm{ESS}(\alpha)$ is decreasing with the maximum at $\mathrm{ESS}(1) = K$ and minimum at $\mathrm{ESS}(0) = 1$.
+This means that all weights are equal, $\mathrm{ESS}(\alpha) = K$, otherwise $\mathrm{ESS}(\alpha)$ is decreasing with the maximum at $\mathrm{ESS}(0) = K$ and minimum at $\mathrm{ESS}(1) = 1$.
 
 \end{document}
