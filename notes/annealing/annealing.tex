@@ -1,0 +1,101 @@
+\documentclass[a4paper]{article}
+
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage{mathtools}
+\usepackage{palatino}
+\usepackage{amssymb}
+\usepackage{amsthm}
+\usepackage{graphicx}
+\usepackage{subcaption}
+\usepackage{booktabs}
+\usepackage{tabulary}
+\usepackage{rotating}
+\usepackage[margin=2cm]{geometry}
+\usepackage{listings}
+\usepackage[ruled,vlined]{algorithm2e}
+\usepackage{hyperref}
+\usepackage[nameinlink,capitalise]{cleveref}
+\usepackage{todonotes}
+\usepackage[round,sort&compress]{natbib}
+\usepackage[acronym,smallcaps,nowarn,section,nogroupskip,nonumberlist]{glossaries}
+
+%% Custom package setup
+% graphics
+\graphicspath{{images/}}
+% bib
+\bibliographystyle{unsrtnat}
+% abbreviations
+\glsdisablehyper{}
+\newacronym{VAE}{vae}{variational auto-encoder}
+\newacronym{KL}{kl}{Kullback-Leibler}
+\newacronym{SGD}{sgd}{stochastic gradient descent}
+\newacronym{SGA}{sga}{stochastic gradient ascent}
+\newacronym{CDAE}{cdae}{coordinate descent auto-encoder}
+\newacronym{ELBO}{elbo}{evidence lower bound}
+\newacronym{EUBO}{eubo}{evidence upper bound}
+% cleveref
+\crefname{algorithm}{Algorithm}{Algorithms}
+\crefname{equation}{Equation}{Equations}
+\crefname{figure}{Figure}{Figure}
+% todonotes
+\presetkeys{todonotes}{%
+  backgroundcolor=blue!10!white,
+  linecolor=blue!10!white,
+  bordercolor=blue!10!white
+}{}
+% misc
+\usepackage[parfill]{parskip}   % skip line instead of indent
+
+\DeclareMathOperator{\E}{{}\mathbb{E}}
+\DeclareMathOperator{\1}{{}\mathds{1}}
+\DeclareMathOperator{\DKL}{{}\mathbb{D}_{\text{\scalebox{0.75}{KL}}}}
+\DeclareMathOperator*{\argmin}{arg\,min} % * allows typesetting beneath
+\DeclareMathOperator*{\argmax}{arg\,max} % * allows typesetting beneath
+\DeclareMathOperator*{\maximize}{maximize}
+\DeclareMathOperator*{\minimize}{minimize}
+\DeclareMathOperator{\ELBO}{\acrshort{ELBO}}
+\DeclareMathOperator{\EUBO}{\acrshort{EUBO}}
+
+\title{Annealing for the Wake Update of $\phi$}
+\author{}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\section{Annealed Weights}
+Given unnormalized weights $(w_k)_{k = 1}^K$, let the expected sample size with annealing parameter $\alpha$ be:
+\begin{align}
+    \mathrm{ESS}(\alpha) := \frac{\left(\sum_{k = 1}^K w_k^\alpha\right)^2}{\sum_{k = 1}^K w_k^{2 \alpha}}.
+\end{align}
+
+Assuming $w_k > 0$ for $k = 1, \dotsc, K$, we can obtain the derivative with respect to $\alpha$:
+\begin{align}
+    \frac{\partial \mathrm{ESS}(\alpha)}{\partial \alpha} &= \frac{2 \left(\sum_{k = 1}^K w_k^\alpha\right) \left( \left(\sum_{k = 1}^K w_k^\alpha \log w_k \right) \left(\sum_{k = 1}^K w_k^{2a   } \right) - \left(\sum_{k = 1}^K w_k^{2 \alpha} \log w_k\right) \left(\sum_{k = 1}^K w_k^\alpha \right) \right)}{\left(\sum_{k = 1}^K w_k^{2 \alpha} \right)^2}. \label{eq:ess-derivative}
+\end{align}
+This can be obtained, for example, using the Sympy package as follows:
+\begin{lstlisting}[language=Python]
+from sympy import *
+from sympy.abc import k, K, a
+w = Function('w')
+simplify(diff(Sum((w(k))**a, (k, 1, K))**2 / Sum((w(k))**(2 * a), (k, 1, K)), a))
+\end{lstlisting}
+
+$\frac{\partial \mathrm{ESS}(\alpha)}{\partial \alpha} \leq 0$ with equality holding if all weights are equal. 
+This is because the second term in the numerator in \eqref{eq:ess-derivative} can be written as:
+\begin{align}
+    &\left(\sum_{k = 1}^K w_k^\alpha \log w_k \right) \left(\sum_{k = 1}^K w_k^{2a   } \right) - \left(\sum_{k = 1}^K w_k^{2 \alpha} \log w_k\right) \left(\sum_{k = 1}^K w_k^\alpha \right) \nonumber
+    \\&= \sum_{i = 1}^K \sum_{j = 1}^K w_i^\alpha w_j^{2 \alpha} \log w_i + \sum_{i = 1}^K \sum_{j = 1}^K w_i^{2 \alpha} w_j^\alpha \log w_i \\
+    &= \sum_{i = 1}^K \sum_{j = 1}^K w_i^\alpha w_j^\alpha \log w_i (w_j^\alpha - w_i^\alpha) \\
+    &= \sum_{\substack{i = 1, \dotsc, K \\ j = 1, \dotsc, K \\ w_i > w_j}} w_i^\alpha w_j^\alpha \log w_i (w_j^\alpha - w_i^\alpha) + \sum_{\substack{i = 1, \dotsc, K \\ j = 1, \dotsc, K \\ w_i < w_j}} w_i^\alpha w_j^\alpha \log w_i (w_j^\alpha - w_i^\alpha) \\
+    &= \sum_{\substack{i = 1, \dotsc, K \\ j = 1, \dotsc, K \\ w_i > w_j}} w_i^\alpha w_j^\alpha \log w_i (w_j^\alpha - w_i^\alpha) + w_j^\alpha w_i^\alpha \log w_j (w_i^\alpha - w_j^\alpha) \\
+    &= \sum_{\substack{i = 1, \dotsc, K \\ j = 1, \dotsc, K \\ w_i > w_j}} w_i^\alpha w_j^\alpha (\log w_i - \log w_j) (w_j - w_i). \label{eq:sum}
+\end{align}
+Since $w_i^\alpha w_j^\alpha > 0$, $(\log w_i - \log w_j) > 0$ and $(w_j - w_i) < 0$, \eqref{eq:sum} is $< 0$.
+If all weights are equal, there are no terms in the sum in \eqref{eq:sum} and \eqref{eq:sum} $= 0$.
+Hence $\frac{\partial \mathrm{ESS}(\alpha)}{\partial \alpha} \leq 0$ with equality holding if all weights are equal.
+This means that all weights are equal, $\mathrm{ESS}(\alpha) = K$, otherwise $\mathrm{ESS}(\alpha)$ is decreasing with the maximum at $\mathrm{ESS}(1) = K$ and minimum at $\mathrm{ESS}(0) = 1$.
+
+\end{document}
