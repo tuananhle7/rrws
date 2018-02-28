@@ -1,4 +1,4 @@
-# Coordinate Descent Auto-Encoder
+# Reweighted Wake-Sleep for Probabilistic Programs (a.k.a. Coordinate Descent Auto-Encoder)
 
 ## GMM Open Universe
 
