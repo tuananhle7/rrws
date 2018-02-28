@@ -30,7 +30,7 @@ def main():
         level=logging.INFO
     )
     algorithm_list = ['is', 'smc']
-    num_particles_list = [20]
+    num_particles_list = [20, 100]
 
     initial_probs, true_transition_probs, obs_means, obs_vars = \
         read_model('model.csv')
@@ -38,7 +38,7 @@ def main():
     test_data = np.genfromtxt('test_data.csv', delimiter=',')
 
     transition_matrix_fig, transition_matrix_ax = plt.subplots(1, 1)
-    transition_matrix_fig.set_size_inches(3.25, 1)
+    transition_matrix_fig.set_size_inches(3.25, 2)
     for algorithm in algorithm_list:
         for num_particles in num_particles_list:
             # Transition matrix
@@ -64,7 +64,7 @@ def main():
             fig.savefig(filename, bbox_inches='tight')
             logging.info('Saved to {}'.format(filename))
 
-            transition_matrix_ax.plot(transition_matrix_norm, label='{} {}'.format(algorithm, num_particles))
+            transition_matrix_ax.plot(transition_matrix_norm[:], label='{} {}'.format(algorithm, num_particles))
 
             # Losses
             filename = '{}_{}_train_theta_loss_history.npy'.format(algorithm, num_particles)
