@@ -239,13 +239,26 @@ class InferenceNetwork(nn.Module):
     get_x_20_params = get_x_2_params
     get_x_21_params = get_x_2_params
 
-    def sample_k(self, obs):
-        if len(obs) == 0:
-            return Variable(torch.Tensor(0))
+    def sample_k(self, obs, relax=False):
+        num_samples = len(obs)
+        if num_samples == 0:
+            if relax:
+                return Variable(torch.Tensor(0)), Variable(torch.Tensor(0)), Variable(torch.Tensor(0))
+            else:
+                return Variable(torch.Tensor(0))
         else:
-            return torch.multinomial(
-                self.get_k_params(obs), 1, replacement=True
-            ).view(-1) + 1
+            if relax:
+                k_prob = self.get_k_params(obs)
+                u_k = Variable(torch.rand(num_samples))
+                v_k = Variable(torch.rand(num_samples))
+                aux_k = reparam(u_k, k_prob[:, 1])
+                k = heaviside(aux_k).detach() + 1
+                aux_k_tilde = conditional_reparam(v_k, k_prob[:, 1], k - 1)
+                return k, aux_k, aux_k_tilde
+            else:
+                return torch.multinomial(
+                    self.get_k_params(obs), 1, replacement=True
+                ).view(-1) + 1
 
     def sample_x_1(self, obs, k):
         if len(obs) == 0:
@@ -254,13 +267,26 @@ class InferenceNetwork(nn.Module):
             x_1_mean, x_1_std = self.get_x_1_params(obs, k)
             return x_1_mean + x_1_std * Variable(torch.Tensor(len(x_1_mean)).normal_())
 
-    def sample_z(self, obs, k):
-        if len(obs) == 0:
-            return Variable(torch.Tensor(0))
+    def sample_z(self, obs, k, relax=False):
+        num_samples = len(obs)
+        if num_samples == 0:
+            if relax:
+                return Variable(torch.Tensor(0)), Variable(torch.Tensor(0)), Variable(torch.Tensor(0))
+            else:
+                return Variable(torch.Tensor(0))
         else:
-            return torch.multinomial(
-                self.get_z_params(obs, k), 1, replacement=True
-            ).view(-1)
+            if relax:
+                z_prob = self.get_z_params(obs, k)
+                u_z = Variable(torch.rand(num_samples))
+                v_z = Variable(torch.rand(num_samples))
+                aux_z = reparam(u_z, z_prob[:, 1])
+                z = heaviside(aux_z).detach()
+                aux_z_tilde = conditional_reparam(v_z, z_prob[:, 1], z)
+                return z, aux_z, aux_z_tilde
+            else:
+                return torch.multinomial(
+                    self.get_z_params(obs, k), 1, replacement=True
+                ).view(-1)
 
     def sample_x_2(self, obs, k, z):
         if len(obs) == 0:
@@ -272,8 +298,11 @@ class InferenceNetwork(nn.Module):
     sample_x_20 = sample_x_2
     sample_x_21 = sample_x_2
 
-    def sample(self, obs):
-        k = self.sample_k(obs)
+    def sample(self, obs, relax=False):
+        if relax:
+            k, aux_k, aux_k_tilde = self.sample_k(obs, relax)
+        else:
+            k = self.sample_k(obs, relax)
 
         k_1 = k[k == 1]
         obs_1 = obs[k == 1]
@@ -281,7 +310,11 @@ class InferenceNetwork(nn.Module):
 
         k_2 = k[k == 2]
         obs_2 = obs[k == 2]
-        z = self.sample_z(obs_2, k_2)
+
+        if relax:
+            z, aux_z, aux_z_tilde = self.sample_z(obs_2, k_2, relax)
+        else:
+            z = self.sample_z(obs_2, k_2, relax)
 
         z_0 = z[z == 0]
         obs_20 = obs_2[z == 0]
@@ -291,11 +324,32 @@ class InferenceNetwork(nn.Module):
         obs_21 = obs_2[z == 1]
         x_21 = self.sample_x_21(obs_21, k_2, z_1)
 
-        return (
-            (k_1, x_1, obs_1),
-            (k_2[z == 0], z_0, x_20, obs_20),
-            (k_2[z == 1], z_1, x_21, obs_21)
-        )
+        if relax:
+            return (
+                (
+                    (k_1, aux_k[k == 1], aux_k_tilde[k == 1]),
+                    x_1,
+                    obs_1
+                ),
+                (
+                    (k_2[z == 0], aux_k[k == 2][z == 0], aux_k_tilde[k == 2][z == 0]),
+                    (z_0, aux_z[z == 0], aux_z_tilde[z == 0]),
+                    x_20,
+                    obs_20
+                ),
+                (
+                    (k_2[z == 1], aux_k[k == 2][z == 1], aux_k_tilde[k == 2][z == 1]),
+                    (z_1, aux_z[z == 1], aux_z_tilde[z == 1]),
+                    x_21,
+                    obs_21
+                )
+            )
+        else:
+            return (
+                (k_1, x_1, obs_1),
+                (k_2[z == 0], z_0, x_20, obs_20),
+                (k_2[z == 1], z_1, x_21, obs_21)
+            )
 
     def k_logpdf(self, k, obs):
         num_samples = len(k)
@@ -353,6 +407,86 @@ class InferenceNetwork(nn.Module):
         )
 
 
+class RelaxControlVariate(nn.Module):
+    def __init__(self):
+        super(RelaxControlVariate, self).__init__()
+        self.control_variate_k = nn.Sequential(
+            nn.Linear(2, 16),
+            nn.Tanh(),
+            nn.Linear(16, 16),
+            nn.Tanh(),
+            nn.Linear(16, 1)
+        )
+        self.control_variate_z = nn.Sequential(
+            nn.Linear(2, 16),
+            nn.Tanh(),
+            nn.Linear(16, 16),
+            nn.Tanh(),
+            nn.Linear(16, 1)
+        )
+
+    def forward(self, aux):
+        (
+            ((aux_k_1, aux_k_1_tilde), obs_1),
+            ((aux_k_20, aux_k_20_tilde), (aux_z_0, aux_z_0_tilde), obs_20),
+            ((aux_k_21, aux_k_21_tilde), (aux_z_1, aux_z_1_tilde), obs_21)
+        ) = aux
+        if len(obs_1) > 0:
+            c_k_1 = self.control_variate_k(
+                torch.cat([obs_1.unsqueeze(-1), aux_k_1.unsqueeze(-1)], dim=1)
+            ).squeeze(-1)
+            c_k_1_tilde = self.control_variate_k(
+                torch.cat([obs_1.unsqueeze(-1), aux_k_1_tilde.unsqueeze(-1)], dim=1)
+            ).squeeze(-1)
+        else:
+            c_k_1 = 0
+            c_k_1_tilde = 0
+
+        if len(obs_20) > 0:
+            c_k_20 = self.control_variate_k(
+                torch.cat([obs_20.unsqueeze(-1), aux_k_20.unsqueeze(-1)], dim=1)
+            ).squeeze(-1)
+            c_k_20_tilde = self.control_variate_k(
+                torch.cat([obs_20.unsqueeze(-1), aux_k_20_tilde.unsqueeze(-1)], dim=1)
+            ).squeeze(-1)
+            c_z_0 = self.control_variate_k(
+                torch.cat([obs_20.unsqueeze(-1), aux_z_0.unsqueeze(-1)], dim=1)
+            ).squeeze(-1)
+            c_z_0_tilde = self.control_variate_k(
+                torch.cat([obs_20.unsqueeze(-1), aux_z_0_tilde.unsqueeze(-1)], dim=1)
+            ).squeeze(-1)
+        else:
+            c_k_20 = 0
+            c_k_20_tilde = 0
+            c_z_0 = 0
+            c_z_0_tilde = 0
+
+        if len(obs_21) > 0:
+            c_k_21 = self.control_variate_k(
+                torch.cat([obs_21.unsqueeze(-1), aux_k_21.unsqueeze(-1)], dim=1)
+            ).squeeze(-1)
+            c_k_21_tilde = self.control_variate_k(
+                torch.cat([obs_21.unsqueeze(-1), aux_k_21_tilde.unsqueeze(-1)], dim=1)
+            ).squeeze(-1)
+            c_z_1 = self.control_variate_k(
+                torch.cat([obs_21.unsqueeze(-1), aux_z_1.unsqueeze(-1)], dim=1)
+            ).squeeze(-1)
+            c_z_1_tilde = self.control_variate_k(
+                torch.cat([obs_21.unsqueeze(-1), aux_z_1_tilde.unsqueeze(-1)], dim=1)
+            ).squeeze(-1)
+        else:
+            c_k_21 = 0
+            c_k_21_tilde = 0
+            c_z_1 = 0
+            c_z_1_tilde = 0
+
+        return (
+            ((c_k_1, c_k_1_tilde)),
+            ((c_k_20, c_k_20_tilde), (c_z_0, c_z_0_tilde)),
+            ((c_k_21, c_k_21_tilde), (c_z_1, c_z_1_tilde))
+        )
+
+
 class IWAE(nn.Module):
     def __init__(self, num_clusters_probs, init_mean_1, std_1, mixture_probs, means_2, stds_2, obs_std):
         super(IWAE, self).__init__()
@@ -401,16 +535,17 @@ class IWAE(nn.Module):
                 log_q_k_20 + log_q_z_0 + log_q_x_20,
                 log_q_k_21 + log_q_z_1 + log_q_x_21
             )
+            log_q_discrete = torch.cat(list(filter(lambda x: isinstance(x, Variable), [
+                log_q_k_1,
+                log_q_k_20 + log_q_z_0,
+                log_q_k_21 + log_q_z_1
+            ])))
             log_weight = torch.cat(list(filter(lambda x: isinstance(x, Variable), map(
                 lambda log_p, log_q: log_p - log_q,
                 log_ps, log_qs
             ))))
             elbo[sample_idx] = logsumexp(log_weight) - np.log(num_particles)
-            result[sample_idx] = elbo[sample_idx] + elbo[sample_idx].detach() * (
-                (torch.sum(log_q_k_1) if isinstance(log_q_k_1, Variable) else 0) +
-                (torch.sum(log_q_k_20) + torch.sum(log_q_z_0) if isinstance(log_q_k_20, Variable) else 0) +
-                (torch.sum(log_q_k_21) + torch.sum(log_q_z_1) if isinstance(log_q_k_21, Variable) else 0)
-            )
+            result[sample_idx] = elbo[sample_idx] + elbo[sample_idx].detach() * torch.sum(log_q_discrete)
 
         return torch.cat(result), torch.cat(elbo)
 
@@ -458,12 +593,83 @@ class IWAE(nn.Module):
 
         return torch.cat(result), torch.cat(elbo)
 
-    def forward(self, obs, gradient_estimator, num_particles=2):
+    def elbo_relax(self, obs, control_variate, num_particles=1):
+        num_samples = len(obs)
+        result = [None for _ in range(num_samples)]
+        elbo = [None for _ in range(num_samples)]
+
+        for sample_idx in range(num_samples):
+            obs_expanded = obs[sample_idx].expand(num_particles)
+            traces_aux = self.inference_network.sample(obs_expanded, relax=True)
+            (
+                ((k_1, aux_k_1, aux_k_1_tilde), x_1, obs_1),
+                ((k_20, aux_k_20, aux_k_20_tilde), (z_0, aux_z_0, aux_z_0_tilde), x_20, obs_20),
+                ((k_21, aux_k_21, aux_k_21_tilde), (z_1, aux_z_1, aux_z_1_tilde), x_21, obs_21)
+            ) = traces_aux
+            traces = (
+                (k_1, x_1, obs_1),
+                (k_20, z_0, x_20, obs_20),
+                (k_21, z_1, x_21, obs_21)
+            )
+            log_ps = self.generative_network.logpdf(traces)
+            (
+                (log_q_k_1, log_q_x_1),
+                (log_q_k_20, log_q_z_0, log_q_x_20),
+                (log_q_k_21, log_q_z_1, log_q_x_21)
+            ) = (
+                (self.inference_network.k_logpdf(k_1, obs_1), self.inference_network.x_1_logpdf(x_1, obs_1, k_1)),
+                (self.inference_network.k_logpdf(k_20, obs_20), self.inference_network.z_logpdf(z_0, obs_20, k_20), self.inference_network.x_20_logpdf(x_20, obs_20, k_20, z_0)),
+                (self.inference_network.k_logpdf(k_21, obs_21), self.inference_network.z_logpdf(z_1, obs_21, k_21), self.inference_network.x_21_logpdf(x_21, obs_21, k_21, z_1))
+            )
+            log_qs = (
+                log_q_k_1 + log_q_x_1,
+                log_q_k_20 + log_q_z_0 + log_q_x_20,
+                log_q_k_21 + log_q_z_1 + log_q_x_21
+            )
+            log_weight = torch.cat(list(filter(lambda x: isinstance(x, Variable), map(
+                lambda log_p, log_q: log_p - log_q,
+                log_ps, log_qs
+            ))))
+            elbo[sample_idx] = logsumexp(log_weight) - np.log(num_particles)
+            (
+                ((c_k_1, c_k_1_tilde)),
+                ((c_k_20, c_k_20_tilde), (c_z_0, c_z_0_tilde)),
+                ((c_k_21, c_k_21_tilde), (c_z_1, c_z_1_tilde))
+            ) = control_variate((
+                ((aux_k_1, aux_k_1_tilde), obs_1),
+                ((aux_k_20, aux_k_20_tilde), (aux_z_0, aux_z_0_tilde), obs_20),
+                ((aux_k_21, aux_k_21_tilde), (aux_z_1, aux_z_1_tilde), obs_21)
+            ))
+            cs = torch.cat(list(filter(lambda x: isinstance(x, Variable), [
+                c_k_1,
+                c_k_20 + c_z_0,
+                c_k_21 + c_z_1
+            ])))
+            cs_tilde = torch.cat(list(filter(lambda x: isinstance(x, Variable), [
+                c_k_1_tilde,
+                c_k_20_tilde + c_z_0_tilde,
+                c_k_21_tilde + c_z_1_tilde
+            ])))
+            c = logsumexp(cs) - np.log(num_particles)
+            c_tilde = logsumexp(cs_tilde) - np.log(num_particles)
+            log_q_discrete = torch.cat(list(filter(lambda x: isinstance(x, Variable), [
+                log_q_k_1,
+                log_q_k_20 + log_q_z_0,
+                log_q_k_21 + log_q_z_1
+            ])))
+            result[sample_idx] = elbo[sample_idx] + (elbo[sample_idx] - c_tilde).detach() * torch.sum(log_q_discrete) + c - c_tilde
+
+        return torch.cat(result), torch.cat(elbo)
+
+    def forward(self, obs, gradient_estimator, num_particles=2, control_variate=None):
         if gradient_estimator == 'reinforce':
             result, elbo = self.elbo_reinforce(obs, num_particles)
             return -torch.mean(result), torch.mean(elbo)
         elif gradient_estimator == 'vimco':
             result, elbo = self.elbo_vimco(obs, num_particles)
+            return -torch.mean(result), torch.mean(elbo)
+        elif gradient_estimator == 'relax':
+            result, elbo = self.elbo_relax(obs, control_variate, num_particles)
             return -torch.mean(result), torch.mean(elbo)
         else:
             raise NotImplementedError
@@ -478,16 +684,34 @@ def train_iwae(
     elbo_history = np.zeros([num_iterations])
     iwae = IWAE(num_clusters_probs, init_mean_1, std_1, mixture_probs, means_2, stds_2, obs_std)
     optimizer = torch.optim.Adam(iwae.parameters(), lr=learning_rate)
+    if gradient_estimator == 'relax':
+        relax_control_variate = RelaxControlVariate()
+        relax_control_variate_optimizer = torch.optim.Adam(relax_control_variate.parameters(), lr=learning_rate)
+        num_parameters = sum([p.nelement() for p in iwae.parameters()])
 
     for i in range(num_iterations):
         traces = generate_traces(num_samples, num_clusters_probs, true_mean_1, std_1, mixture_probs, means_2, stds_2, obs_std)
         obs = Variable(torch.Tensor([trace[-1] for trace in traces]))
 
-        optimizer.zero_grad()
-        loss, elbo = iwae(obs, gradient_estimator, num_particles)
+        if gradient_estimator == 'relax':
+            # Optimize IWAE
+            optimizer.zero_grad()
+            loss, elbo = iwae(obs, gradient_estimator, num_particles, relax_control_variate)
+            loss.backward(create_graph=True)
 
-        loss.backward()
-        optimizer.step()
+            loss_grad_detached = [p.grad.detach() / num_parameters for p in iwae.parameters()]
+
+            # Optimize Relax control variate
+            relax_control_variate_optimizer.zero_grad()
+            loss_grad = [p.grad for p in iwae.parameters()]
+            torch.autograd.backward(loss_grad, loss_grad_detached)
+            relax_control_variate_optimizer.step()
+        else:
+            optimizer.zero_grad()
+            loss, elbo = iwae(obs, gradient_estimator, num_particles)
+
+            loss.backward()
+            optimizer.step()
 
         elbo_history[i] = elbo.data[0]
         mean_1_history[i] = iwae.generative_network.mean_1.data[0]
@@ -737,6 +961,21 @@ def main():
     for [data, filename] in zip(
         [iwae_vimco_elbo_history, iwae_vimco_mean_1_history],
         ['iwae_vimco_elbo_history.npy', 'iwae_vimco_mean_1_history.npy']
+    ):
+        np.save(filename, data)
+        print('Saved to {}'.format(filename))
+
+    ## Relax
+    gradient_estimator = 'relax'
+
+    iwae_relax_elbo_history, iwae_relax, iwae_relax_mean_1_history = train_iwae(
+        num_clusters_probs, init_mean_1, std_1, mixture_probs, means_2, stds_2, obs_std,
+        true_mean_1,
+        num_iterations, iwae_num_samples, iwae_num_particles, gradient_estimator, learning_rate
+    )
+    for [data, filename] in zip(
+        [iwae_relax_elbo_history, iwae_relax_mean_1_history],
+        ['iwae_relax_elbo_history.npy', 'iwae_relax_mean_1_history.npy']
     ):
         np.save(filename, data)
         print('Saved to {}'.format(filename))

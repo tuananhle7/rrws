@@ -118,3 +118,37 @@ def get_posterior_pdf(x_points, num_samples, obs, num_clusters_probs, mean_1, st
 def get_obs_pdf(obs_points, num_samples, num_clusters_probs, mean_1, std_1, mixture_probs, means_2, stds_2, obs_std):
     traces = generate_traces(num_samples, num_clusters_probs, mean_1, std_1, mixture_probs, means_2, stds_2, obs_std, True)
     return scipy.stats.gaussian_kde([trace[-1] for trace in traces]).evaluate(obs_points)
+
+
+def heaviside(x):
+    return x >= 0
+
+
+def reparam(u, theta, epsilon=1e-10):
+    return torch.log(theta + epsilon) - torch.log(1 - theta + epsilon) + torch.log(u + epsilon) - torch.log(1 - u + epsilon)
+
+
+def conditional_reparam(v, theta, b, epsilon=1e-10):
+    # NB: This is a buggy implementation that performs the best
+    # if b.data[0] == 1:
+    #     return torch.log(v / ((1 - v) * (1 - theta)) + 1 + epsilon)
+    # else:
+    #     return -torch.log(v / ((1 - v) * theta) + 1 + epsilon)
+
+    # NB: This implementation gives "Segmentation Fault 11"
+    # result = Variable(torch.zeros(*b.size()))
+    # for i in range(2):
+    #     v_i = v[b.data == i]
+    #     theta_i = theta[b.data == i]
+    #     if i == 1:
+    #         result[b.data == i] = torch.log(v_i / ((1 - v_i) * (1 - theta_i)) + 1 + epsilon)
+    #     else:
+    #         result[b.data == i] = -torch.log(v_i / ((1 - v_i) * theta_i) + 1 + epsilon)
+    #
+    # return result
+
+    # NB: This implementation is inefficient but should be correct
+    return (
+        torch.log(v / ((1 - v) * (1 - theta)) + 1 + epsilon) * (b == 1).float() +
+        (-torch.log(v / ((1 - v) * theta) + 1 + epsilon)) * (b == 0).float()
+    )
