@@ -277,10 +277,10 @@ class InferenceNetwork(nn.Module):
 
         k_1 = k[k == 1]
         obs_1 = obs[k == 1]
-        obs_2 = obs[k == 2]
         x_1 = self.sample_x_1(obs_1, k_1)
 
         k_2 = k[k == 2]
+        obs_2 = obs[k == 2]
         z = self.sample_z(obs_2, k_2)
 
         z_0 = z[z == 0]
@@ -303,7 +303,7 @@ class InferenceNetwork(nn.Module):
             return 0
         else:
             return torch.gather(
-                self.get_k_params(obs),
+                torch.log(self.get_k_params(obs)),
                 1,
                 k.long().unsqueeze(-1) - 1
             ).view(-1)
@@ -325,7 +325,7 @@ class InferenceNetwork(nn.Module):
             return 0
         else:
             return torch.gather(
-                self.get_z_params(obs, k),
+                torch.log(self.get_z_params(obs, k)),
                 1,
                 z.long().unsqueeze(-1)
             ).view(-1)
@@ -529,6 +529,7 @@ class RWS(nn.Module):
         for sample_idx in range(num_samples):
             obs_expanded = obs[sample_idx].expand(num_particles)
             traces = self.inference_network.sample(obs_expanded)
+            traces = tuple(map(lambda x: tuple(map(lambda y: y.detach(), x)), traces))
             (k_1, x_1, obs_1), (k_20, z_0, x_20, obs_20), (k_21, z_1, x_21, obs_21) = traces
             log_ps = self.generative_network.logpdf(traces)
             log_qs = self.inference_network.logpdf(traces)
@@ -542,6 +543,7 @@ class RWS(nn.Module):
 
     def sleep_phi(self, num_samples):
         traces = self.generative_network.sample(num_samples)
+        traces = tuple(map(lambda x: tuple(map(lambda y: y.detach(), x)), traces))
         return -torch.cat(list(filter(
             lambda x: isinstance(x, Variable),
             self.inference_network.logpdf(traces)
@@ -554,6 +556,7 @@ class RWS(nn.Module):
         for sample_idx in range(num_samples):
             obs_expanded = obs[sample_idx].expand(num_particles)
             traces = self.inference_network.sample(obs_expanded)
+            traces = tuple(map(lambda x: tuple(map(lambda y: y.detach(), x)), traces))
             (k_1, x_1, obs_1), (k_20, z_0, x_20, obs_20), (k_21, z_1, x_21, obs_21) = traces
             log_ps = self.generative_network.logpdf(traces)
             log_qs = self.inference_network.logpdf(traces)
