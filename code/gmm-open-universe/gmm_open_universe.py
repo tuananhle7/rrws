@@ -912,7 +912,7 @@ def main():
 
     init_mean_1 = 2
 
-    num_iterations = 10000
+    num_iterations = 15000
     learning_rate = 0.001
 
     # VAE
