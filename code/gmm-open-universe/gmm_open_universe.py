@@ -1065,7 +1065,7 @@ def main():
     wake_phi = True
     anneal_wake_phi = True
     init_anneal_factor = 0
-    ess_threshold = 0.90
+    ess_threshold = 0.60
 
     waw_mean_1_history, waw_wake_theta_loss_history, _, waw_wake_phi_loss_history, waw_anneal_factor_history = train_rws(
         num_clusters_probs, init_mean_1, std_1, mixture_probs, means_2, stds_2, obs_std,
@@ -1086,7 +1086,7 @@ def main():
     wake_phi = True
     anneal_wake_phi = True
     init_anneal_factor = 0
-    ess_threshold = 0.90
+    ess_threshold = 0.60
 
     wsaw_mean_1_history, wsaw_wake_theta_loss_history, wsaw_sleep_phi_loss_history, wsaw_wake_phi_loss_history, wsaw_anneal_factor_history = train_rws(
         num_clusters_probs, init_mean_1, std_1, mixture_probs, means_2, stds_2, obs_std,
