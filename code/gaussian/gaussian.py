@@ -496,7 +496,7 @@ def main():
     init_anneal_factor = 0
     ess_threshold = 0.90
 
-    wsaw_prior_mean_history, wsaw_obs_std_history, wsaw_multiplier_history, wsaw_offset_history, wsaw_std_history, wsaw_wake_theta_loss_history, _, wsaw_wake_phi_loss_history, wsaw_anneal_factor_history = train_rws(
+    wsaw_prior_mean_history, wsaw_obs_std_history, wsaw_multiplier_history, wsaw_offset_history, wsaw_std_history, wsaw_wake_theta_loss_history, wsaw_sleep_phi_loss_history, wsaw_wake_phi_loss_history, wsaw_anneal_factor_history = train_rws(
         init_prior_mean, prior_std, init_obs_std, init_multiplier, init_offset, init_std,
         true_prior_mean, true_prior_std,  true_obs_std,
         sleep_phi, wake_phi, rws_num_particles,
@@ -507,8 +507,8 @@ def main():
         wsaw_prior_mean_history, true_prior_std, wsaw_obs_std_history
     )
     for [data, filename] in zip(
-        [wsaw_prior_mean_history, wsaw_obs_std_history, wsaw_multiplier_history, wsaw_offset_history, wsaw_std_history, wsaw_wake_theta_loss_history, wsaw_wake_phi_loss_history, wsaw_anneal_factor_history, wsaw_true_multiplier_history, wsaw_true_offset_history, wsaw_true_std_history],
-        ['wsaw_prior_mean_history.npy', 'wsaw_obs_std_history.npy', 'wsaw_multiplier_history.npy', 'wsaw_offset_history.npy', 'wsaw_std_history.npy', 'wsaw_wake_theta_loss_history.npy', 'wsaw_wake_phi_loss_history.npy', 'wsaw_anneal_factor_history.npy', 'wsaw_true_multiplier_history.npy', 'wsaw_true_offset_history.npy', 'wsaw_true_std_history.npy']
+        [wsaw_prior_mean_history, wsaw_obs_std_history, wsaw_multiplier_history, wsaw_offset_history, wsaw_std_history, wsaw_wake_theta_loss_history, wsaw_sleep_phi_loss_history, wsaw_wake_phi_loss_history, wsaw_anneal_factor_history, wsaw_true_multiplier_history, wsaw_true_offset_history, wsaw_true_std_history],
+        ['wsaw_prior_mean_history.npy', 'wsaw_obs_std_history.npy', 'wsaw_multiplier_history.npy', 'wsaw_offset_history.npy', 'wsaw_std_history.npy', 'wsaw_wake_theta_loss_history.npy', 'wsaw_sleep_phi_loss_history.npy', 'wsaw_wake_phi_loss_history.npy', 'wsaw_anneal_factor_history.npy', 'wsaw_true_multiplier_history.npy', 'wsaw_true_offset_history.npy', 'wsaw_true_std_history.npy']
     ):
         np.save(filename, data)
         print('Saved to {}'.format(filename))
