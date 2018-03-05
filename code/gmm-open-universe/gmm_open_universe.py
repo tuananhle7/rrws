@@ -21,54 +21,56 @@ class GenerativeNetwork(nn.Module):
         super(GenerativeNetwork, self).__init__()
         self.num_clusters_max = len(num_clusters_probs)
         self.num_mixtures = len(mixture_probs)
-        self.num_clusters_probs = Variable(torch.Tensor(num_clusters_probs))
+        self.num_clusters_probs = num_clusters_probs
         self.mean_1 = nn.Parameter(torch.Tensor([init_mean_1]))
         self.std_1 = std_1
-        self.mixture_probs = Variable(torch.Tensor(mixture_probs))
-        self.means_2 = Variable(torch.Tensor(means_2))
+        self.mixture_probs = mixture_probs
+        self.means_2 = means_2
         self.stds_2 = stds_2
         self.obs_std = obs_std
 
     def sample_k(self, num_samples):
         if num_samples == 0:
-            return Variable(torch.Tensor(0))
+            return Variable(self.mean_1.data.new(0))
         else:
             return torch.multinomial(
-                self.num_clusters_probs, num_samples, replacement=True
+                Variable(self.mean_1.data.new(self.num_clusters_probs)),
+                num_samples, replacement=True
             ) + 1
 
     def sample_x_1(self, num_samples):
         if num_samples == 0:
-            return Variable(torch.Tensor(0))
+            return Variable(self.mean_1.data.new(0))
         else:
-            return self.mean_1 + self.std_1 * Variable(torch.Tensor(num_samples).normal_())
+            return self.mean_1 + self.std_1 * Variable(self.mean_1.data.new(num_samples).normal_())
 
     def sample_z(self, num_samples):
         if num_samples == 0:
-            return Variable(torch.Tensor(0))
+            return Variable(self.mean_1.data.new(0))
         else:
             return torch.multinomial(
-                self.mixture_probs, num_samples, replacement=True
+                Variable(self.mean_1.data.new(self.mixture_probs)),
+                num_samples, replacement=True
             )
 
     def sample_x_20(self, num_samples):
         if num_samples == 0:
-            return Variable(torch.Tensor(0))
+            return Variable(self.mean_1.data.new(0))
         else:
-            return self.means_2[0] + self.stds_2[0] * Variable(torch.Tensor(num_samples).normal_())
+            return Variable(self.mean_1.data.new(self.means_2))[0] + self.stds_2[0] * Variable(self.mean_1.data.new(num_samples).normal_())
 
     def sample_x_21(self, num_samples):
         if num_samples == 0:
-            return Variable(torch.Tensor(0))
+            return Variable(self.mean_1.data.new(0))
         else:
-            return self.means_2[1] + self.stds_2[1] * Variable(torch.Tensor(num_samples).normal_())
+            return Variable(self.mean_1.data.new(self.means_2))[1] + self.stds_2[1] * Variable(self.mean_1.data.new(num_samples).normal_())
 
     def sample_obs(self, x):
         num_samples = len(x)
         if num_samples == 0:
-            return Variable(torch.Tensor(0))
+            return Variable(self.mean_1.data.new(0))
         else:
-            return x + self.obs_std * Variable(torch.Tensor(num_samples).normal_())
+            return x + self.obs_std * Variable(self.mean_1.data.new(num_samples).normal_())
 
     def sample(self, num_samples):
         k = self.sample_k(num_samples)
@@ -100,7 +102,7 @@ class GenerativeNetwork(nn.Module):
             return 0
         else:
             return torch.gather(
-                torch.log(self.num_clusters_probs).unsqueeze(0).expand(num_samples, self.num_clusters_max),
+                Variable(self.mean_1.data.new(self.num_clusters_probs)).log().unsqueeze(0).expand(num_samples, self.num_clusters_max),
                 1,
                 k.long().unsqueeze(-1) - 1
             ).view(-1)
@@ -121,7 +123,7 @@ class GenerativeNetwork(nn.Module):
             return 0
         else:
             return torch.gather(
-                torch.log(self.mixture_probs).unsqueeze(0).expand(num_samples, self.num_mixtures),
+                Variable(self.mean_1.data.new(self.mixture_probs)).log().unsqueeze(0).expand(num_samples, self.num_mixtures),
                 1,
                 z.long().unsqueeze(-1)
             ).view(-1)
@@ -132,7 +134,7 @@ class GenerativeNetwork(nn.Module):
             return 0
         else:
             return torch.distributions.Normal(
-                mean=self.means_2[0].expand(num_samples),
+                mean=Variable(self.mean_1.data.new(self.means_2))[0].expand(num_samples),
                 std=self.stds_2[0]
             ).log_prob(x_20)
 
@@ -142,7 +144,7 @@ class GenerativeNetwork(nn.Module):
             return 0
         else:
             return torch.distributions.Normal(
-                mean=self.means_2[1].expand(num_samples),
+                mean=Variable(self.mean_1.data.new(self.means_2))[1].expand(num_samples),
                 std=self.stds_2[1]
             ).log_prob(x_21)
 
@@ -217,13 +219,13 @@ class InferenceNetwork(nn.Module):
 
     def get_k_params(self, obs):
         if len(obs) == 0:
-            return Variable(torch.Tensor(0))
+            return Variable(obs.data.new(0))
         else:
             return self.obs_to_k_params(obs.unsqueeze(-1))
 
     def get_x_1_params(self, obs, k):
         if len(obs) == 0:
-            return Variable(torch.Tensor(0)), Variable(torch.Tensor(0))
+            return Variable(obs.data.new(0)), Variable(obs.data.new(0))
         else:
             mean = self.obs_k_to_x_mean(obs.unsqueeze(-1))
             std = torch.exp(self.obs_k_to_x_logstd(obs.unsqueeze(-1)))
@@ -231,15 +233,15 @@ class InferenceNetwork(nn.Module):
 
     def get_z_params(self, obs, k):
         if len(obs) == 0:
-            return Variable(torch.Tensor(0))
+            return Variable(obs.data.new(0))
         else:
             return self.obs_k_to_z_params(obs.unsqueeze(-1))
 
     def get_x_2_params(self, obs, k, z):
         if len(obs) == 0:
-            return Variable(torch.Tensor(0)), Variable(torch.Tensor(0))
+            return Variable(obs.data.new(0)), Variable(obs.data.new(0))
         else:
-            z_one_hot = Variable(torch.zeros(len(z), self.num_mixtures)).scatter_(1, z.long().unsqueeze(-1), 1)
+            z_one_hot = Variable(obs.data.new(len(z), self.num_mixtures).fill_(0)).scatter_(1, z.long().unsqueeze(-1), 1)
             obs_z = torch.cat([obs.unsqueeze(-1), z_one_hot], dim=1)
             mean = self.obs_k_z_to_x_mean(obs_z)
             std = torch.exp(self.obs_k_z_to_x_logstd(obs_z))
@@ -252,14 +254,14 @@ class InferenceNetwork(nn.Module):
         num_samples = len(obs)
         if num_samples == 0:
             if relax:
-                return Variable(torch.Tensor(0)), Variable(torch.Tensor(0)), Variable(torch.Tensor(0))
+                return Variable(obs.data.new(0)), Variable(obs.data.new(0)), Variable(obs.data.new(0))
             else:
-                return Variable(torch.Tensor(0))
+                return Variable(obs.data.new(0))
         else:
             if relax:
                 k_prob = self.get_k_params(obs)
-                u_k = Variable(torch.rand(num_samples))
-                v_k = Variable(torch.rand(num_samples))
+                u_k = Variable(obs.data.new(num_samples).uniform_())
+                v_k = Variable(obs.data.new(num_samples).uniform_())
                 aux_k = reparam(u_k, k_prob[:, 1])
                 k = heaviside(aux_k).detach() + 1
                 aux_k_tilde = conditional_reparam(v_k, k_prob[:, 1], k - 1)
@@ -271,23 +273,23 @@ class InferenceNetwork(nn.Module):
 
     def sample_x_1(self, obs, k):
         if len(obs) == 0:
-            return Variable(torch.Tensor(0))
+            return Variable(obs.data.new(0))
         else:
             x_1_mean, x_1_std = self.get_x_1_params(obs, k)
-            return x_1_mean + x_1_std * Variable(torch.Tensor(len(x_1_mean)).normal_())
+            return x_1_mean + x_1_std * Variable(obs.data.new(len(x_1_mean)).normal_())
 
     def sample_z(self, obs, k, relax=False):
         num_samples = len(obs)
         if num_samples == 0:
             if relax:
-                return Variable(torch.Tensor(0)), Variable(torch.Tensor(0)), Variable(torch.Tensor(0))
+                return Variable(obs.data.new(0)), Variable(obs.data.new(0)), Variable(obs.data.new(0))
             else:
-                return Variable(torch.Tensor(0))
+                return Variable(obs.data.new(0))
         else:
             if relax:
                 z_prob = self.get_z_params(obs, k)
-                u_z = Variable(torch.rand(num_samples))
-                v_z = Variable(torch.rand(num_samples))
+                u_z = Variable(obs.data.new(num_samples).uniform_())
+                v_z = Variable(obs.data.new(num_samples).uniform_())
                 aux_z = reparam(u_z, z_prob[:, 1])
                 z = heaviside(aux_z).detach()
                 aux_z_tilde = conditional_reparam(v_z, z_prob[:, 1], z)
@@ -299,10 +301,10 @@ class InferenceNetwork(nn.Module):
 
     def sample_x_2(self, obs, k, z):
         if len(obs) == 0:
-            return Variable(torch.Tensor(0))
+            return Variable(obs.data.new(0))
         else:
             x_2_mean, x_2_std = self.get_x_2_params(obs, k, z)
-            return x_2_mean + x_2_std * Variable(torch.Tensor(len(x_2_mean)).normal_())
+            return x_2_mean + x_2_std * Variable(obs.data.new(len(x_2_mean)).normal_())
 
     sample_x_20 = sample_x_2
     sample_x_21 = sample_x_2
@@ -692,13 +694,19 @@ def train_iwae(
     mean_1_history = np.zeros([num_iterations])
     elbo_history = np.zeros([num_iterations])
     iwae = IWAE(num_clusters_probs, init_mean_1, std_1, mixture_probs, means_2, stds_2, obs_std)
+    if CUDA:
+        iwae.cuda()
     optimizer = torch.optim.Adam(iwae.parameters(), lr=learning_rate)
     if gradient_estimator == 'relax':
         relax_control_variate = RelaxControlVariate()
+        if CUDA:
+            relax_control_variate.cuda()
         relax_control_variate_optimizer = torch.optim.Adam(relax_control_variate.parameters(), lr=learning_rate)
         num_parameters = sum([p.nelement() for p in iwae.parameters()])
 
     true_generative_network = GenerativeNetwork(num_clusters_probs, true_mean_1, std_1, mixture_probs, means_2, stds_2, obs_std)
+    if CUDA:
+        true_generative_network.cuda()
 
     for i in range(num_iterations):
         obs = generate_obs(num_samples, true_generative_network)
@@ -853,10 +861,16 @@ def train_rws(
     else:
         rws = RWS(num_clusters_probs, init_mean_1, std_1, mixture_probs, means_2, stds_2, obs_std)
 
+    if CUDA:
+        rws.cuda()
+
     theta_optimizer = torch.optim.Adam(rws.generative_network.parameters(), lr=theta_learning_rate)
     phi_optimizer = torch.optim.Adam(rws.inference_network.parameters(), lr=phi_learning_rate)
 
     true_generative_network = GenerativeNetwork(num_clusters_probs, true_mean_1, std_1, mixture_probs, means_2, stds_2, obs_std)
+    if CUDA:
+        true_generative_network.cuda()
+
     for i in range(num_iterations):
         obs = generate_obs(num_samples, true_generative_network)
 
@@ -1113,5 +1127,26 @@ def main():
         print('Saved to {}'.format(filename))
 
 
+# globals
+CUDA = False
+
+
 if __name__ == '__main__':
+    torch.backends.cudnn.benchmark = True
+    import argparse
+
+    parser = argparse.ArgumentParser(description='GMM open universe')
+    parser.add_argument('--cuda', action='store_true', default=False,
+                        help='disables CUDA use')
+    parser.add_argument('--seed', type=int, default=1, metavar='S',
+                        help='random seed (default: 1)')
+    args = parser.parse_args()
+    args.cuda = args.cuda and torch.cuda.is_available()
+    CUDA = args.cuda
+
+    torch.manual_seed(args.seed)
+    if args.cuda:
+        torch.cuda.manual_seed(args.seed)
+
+    print('CUDA:', CUDA)
     main()
