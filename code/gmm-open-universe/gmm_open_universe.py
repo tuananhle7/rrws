@@ -718,6 +718,7 @@ def train_iwae(
             loss.backward(create_graph=True)
 
             loss_grad_detached = [p.grad.detach() / num_parameters for p in iwae.parameters()]
+            optimizer.step()
 
             # Optimize Relax control variate
             relax_control_variate_optimizer.zero_grad()
@@ -734,7 +735,7 @@ def train_iwae(
         elbo_history[i] = elbo.data[0]
         mean_1_history[i] = iwae.generative_network.mean_1.data[0]
         if i % 100 == 0:
-            print('Iteration {}'.format(i))
+            print('Iteration {}: mean_1 = {}'.format(i, mean_1_history[i]))
 
     return elbo_history, iwae, mean_1_history
 
