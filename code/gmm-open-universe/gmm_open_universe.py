@@ -710,6 +710,7 @@ def train_iwae(
             loss.backward(create_graph=True)
 
             loss_grad_detached = [p.grad.detach() / num_parameters for p in iwae.parameters()]
+            optimizer.step()
 
             # Optimize Relax control variate
             relax_control_variate_optimizer.zero_grad()
