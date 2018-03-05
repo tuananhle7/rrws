@@ -7,6 +7,15 @@ import torch
 import torch.nn as nn
 
 
+def generate_obs(num_samples, generative_network):
+    (
+        (_, _, obs_1),
+        (_, _, _, obs_20),
+        (_, _, _, obs_21)
+    ) = generative_network.sample(num_samples)
+    return torch.cat(list(filter(lambda x: len(x) > 0, [obs_1, obs_20, obs_21])))
+
+
 class GenerativeNetwork(nn.Module):
     def __init__(self, num_clusters_probs, init_mean_1, std_1, mixture_probs, means_2, stds_2, obs_std):
         super(GenerativeNetwork, self).__init__()
@@ -689,9 +698,10 @@ def train_iwae(
         relax_control_variate_optimizer = torch.optim.Adam(relax_control_variate.parameters(), lr=learning_rate)
         num_parameters = sum([p.nelement() for p in iwae.parameters()])
 
+    true_generative_network = GenerativeNetwork(num_clusters_probs, true_mean_1, std_1, mixture_probs, means_2, stds_2, obs_std)
+
     for i in range(num_iterations):
-        traces = generate_traces(num_samples, num_clusters_probs, true_mean_1, std_1, mixture_probs, means_2, stds_2, obs_std)
-        obs = Variable(torch.Tensor([trace[-1] for trace in traces]))
+        obs = generate_obs(num_samples, true_generative_network)
 
         if gradient_estimator == 'relax':
             # Optimize IWAE
@@ -846,9 +856,9 @@ def train_rws(
     theta_optimizer = torch.optim.Adam(rws.generative_network.parameters(), lr=theta_learning_rate)
     phi_optimizer = torch.optim.Adam(rws.inference_network.parameters(), lr=phi_learning_rate)
 
+    true_generative_network = GenerativeNetwork(num_clusters_probs, true_mean_1, std_1, mixture_probs, means_2, stds_2, obs_std)
     for i in range(num_iterations):
-        traces = generate_traces(num_samples, num_clusters_probs, true_mean_1, std_1, mixture_probs, means_2, stds_2, obs_std)
-        obs = Variable(torch.Tensor([trace[-1] for trace in traces]))
+        obs = generate_obs(num_samples, true_generative_network)
 
         # Wake theta
         theta_optimizer.zero_grad()

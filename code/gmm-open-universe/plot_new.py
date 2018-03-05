@@ -43,6 +43,9 @@ def main():
     ## VIMCO
     iwae_vimco_elbo_history, iwae_vimco_mean_1_history = np.load('iwae_vimco_elbo_history.npy'), np.load('iwae_vimco_mean_1_history.npy')
 
+    ## Relax
+    iwae_relax_elbo_history, iwae_relax_mean_1_history = np.load('iwae_relax_elbo_history.npy'), np.load('iwae_relax_mean_1_history.npy')
+
     # WS
     theta_learning_rate = learning_rate
     phi_learning_rate = learning_rate
@@ -74,26 +77,28 @@ def main():
     # Plot params
     fig, ax = plt.subplots(1, 1)
 
-    fig.set_size_inches(3.25, 2)
+    fig.set_size_inches(5, 2)
 
     ax.spines['top'].set_visible(False)
     ax.spines['right'].set_visible(False)
 
-    ax.plot(iwae_vimco_mean_1_history, color='0.8', linestyle=':', label='iwae-vimco-{}'.format(iwae_num_particles))
-    ax.plot(iwae_reinforce_mean_1_history, color='0.2', linestyle=':', label='iwae-reinforce-{}'.format(iwae_num_particles))
-    ax.plot(vae_reinforce_mean_1_history, color='0.2', linestyle=':', label='vae-reinforce')
-    ax.plot(ws1_mean_1_history, color='black', linestyle='-.', label='ws-1')
-    ax.plot(ws_mean_1_history, color='black', linestyle='-.', label='ws-{}'.format(rws_num_particles))
-    ax.plot(ww_mean_1_history, color='0.8', linestyle='-', label='ww-{}'.format(rws_num_particles))
-    ax.plot(wsw_mean_1_history, color='0.2', linestyle='-', label='wsw-{}'.format(rws_num_particles))
-    ax.plot(waw_mean_1_history, color='0.8', linestyle='--', label='waw-{}'.format(rws_num_particles))
-    ax.plot(wsaw_mean_1_history, color='0.2', linestyle='--', label='wsaw-{}'.format(rws_num_particles))
-
     ax.axhline(true_mean_1, color='black', label='true')
+
+    ax.plot(vae_reinforce_mean_1_history, color='0.8', linestyle=':', label='vae-reinforce')
+    ax.plot(iwae_reinforce_mean_1_history, color='0.5', linestyle=':', label='iwae-reinforce-{}'.format(iwae_num_particles))
+    ax.plot(iwae_vimco_mean_1_history, color='black', linestyle=':', label='iwae-vimco-{}'.format(iwae_num_particles))
+    ax.plot(iwae_relax_mean_1_history, color='black', linestyle=':', label='iwae-relax-{}'.format(iwae_num_particles))
+    ax.plot(ws1_mean_1_history, color='0.8', linestyle='-.', label='ws-1')
+    ax.plot(ws_mean_1_history, color='0.5', linestyle='-.', label='ws-{}'.format(rws_num_particles))
+    ax.plot(ww_mean_1_history, color='0.8', linestyle='--', label='ww-{}'.format(rws_num_particles))
+    ax.plot(wsw_mean_1_history, color='0.5', linestyle='--', label='wsw-{}'.format(rws_num_particles))
+    ax.plot(waw_mean_1_history, color='0.8', linestyle='-', label='waw-{}'.format(rws_num_particles))
+    ax.plot(wsaw_mean_1_history, color='0.5', linestyle='-', label='wsaw-{}'.format(rws_num_particles))
+
     ax.set_ylabel('$\mu_{1, 1}$')
 
     ax.set_xlabel('Iteration')
-    ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.25), ncol=4)
+    ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.25), ncol=5)
     fig.tight_layout()
 
     filename = '3gs_params.pdf'
@@ -108,20 +113,21 @@ def main():
     ax.spines['top'].set_visible(False)
     ax.spines['right'].set_visible(False)
 
-    ax.plot(-iwae_vimco_elbo_history, color='0.8', linestyle=':', label='iwae-vimco-{}'.format(iwae_num_particles))
-    ax.plot(-iwae_reinforce_elbo_history, color='0.2', linestyle=':', label='iwae-reinforce-{}'.format(iwae_num_particles))
-    ax.plot(-vae_reinforce_elbo_history, color='black', linestyle=':', label='vae-reinforce')
+    ax.plot(-vae_reinforce_elbo_history, color='0.8', linestyle=':', label='vae-reinforce')
+    ax.plot(-iwae_reinforce_elbo_history, color='0.5', linestyle=':', label='iwae-reinforce-{}'.format(iwae_num_particles))
+    ax.plot(-iwae_vimco_elbo_history, color='black', linestyle=':', label='iwae-vimco-{}'.format(iwae_num_particles))
+    ax.plot(-iwae_relax_elbo_history, color='black', linestyle=':', label='iwae-relax-{}'.format(iwae_num_particles))
     ax.plot(ws1_wake_theta_loss_history, color='0.8', linestyle='-.', label='ws-1')
-    ax.plot(ws_wake_theta_loss_history, color='black', linestyle='-.', label='ws-{}'.format(rws_num_particles))
-    ax.plot(ww_wake_theta_loss_history, color='0.8', linestyle='-', label='ww-{}'.format(rws_num_particles))
-    ax.plot(wsw_wake_theta_loss_history, color='0.2', linestyle='-', label='wsw-{}'.format(rws_num_particles))
-    ax.plot(waw_wake_theta_loss_history, color='0.8', linestyle='--', label='waw-{}'.format(rws_num_particles))
-    ax.plot(wsaw_wake_theta_loss_history, color='0.2', linestyle='--', label='wsaw-{}'.format(rws_num_particles))
+    ax.plot(ws_wake_theta_loss_history, color='0.5', linestyle='-.', label='ws-{}'.format(rws_num_particles))
+    ax.plot(ww_wake_theta_loss_history, color='0.8', linestyle='--', label='ww-{}'.format(rws_num_particles))
+    ax.plot(wsw_wake_theta_loss_history, color='0.5', linestyle='--', label='wsw-{}'.format(rws_num_particles))
+    ax.plot(waw_wake_theta_loss_history, color='0.8', linestyle='-', label='waw-{}'.format(rws_num_particles))
+    ax.plot(wsaw_wake_theta_loss_history, color='0.5', linestyle='-', label='wsaw-{}'.format(rws_num_particles))
 
     ax.set_ylabel('Loss')
 
     ax.set_xlabel('Iteration')
-    ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.25), ncol=4)
+    ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.25), ncol=5)
     fig.tight_layout()
 
     filename = '3gs_losses.pdf'
