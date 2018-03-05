@@ -944,6 +944,8 @@ def main():
 
     # VAE
     vae_num_samples = 100
+
+    ## Reinforce
     gradient_estimator = 'reinforce'
 
     vae_reinforce_elbo_history, vae_reinforce, vae_reinforce_mean_1_history = train_iwae(
@@ -958,54 +960,68 @@ def main():
         save_data(filename, data)
         print('Saved to {}'.format(filename))
 
-    # IWAE
-    iwae_num_samples = 100
-    iwae_num_particles = 10
-
-    ## Reinforce
-    gradient_estimator = 'reinforce'
-
-    iwae_reinforce_elbo_history, iwae_reinforce, iwae_reinforce_mean_1_history = train_iwae(
-        num_clusters_probs, init_mean_1, std_1, mixture_probs, means_2, stds_2, obs_std,
-        true_mean_1,
-        num_iterations, iwae_num_samples, iwae_num_particles, gradient_estimator, learning_rate
-    )
-    for [data, filename] in zip(
-        [iwae_reinforce_elbo_history, iwae_reinforce_mean_1_history],
-        ['iwae_reinforce_elbo_history', 'iwae_reinforce_mean_1_history']
-    ):
-        save_data(filename, data)
-        print('Saved to {}'.format(filename))
-
-    ## VIMCO
-    gradient_estimator = 'vimco'
-
-    iwae_vimco_elbo_history, iwae_vimco, iwae_vimco_mean_1_history = train_iwae(
-        num_clusters_probs, init_mean_1, std_1, mixture_probs, means_2, stds_2, obs_std,
-        true_mean_1,
-        num_iterations, iwae_num_samples, iwae_num_particles, gradient_estimator, learning_rate
-    )
-    for [data, filename] in zip(
-        [iwae_vimco_elbo_history, iwae_vimco_mean_1_history],
-        ['iwae_vimco_elbo_history', 'iwae_vimco_mean_1_history']
-    ):
-        save_data(filename, data)
-        print('Saved to {}'.format(filename))
-
     ## Relax
     gradient_estimator = 'relax'
 
-    iwae_relax_elbo_history, iwae_relax, iwae_relax_mean_1_history = train_iwae(
+    vae_relax_elbo_history, vae_relax, vae_relax_mean_1_history = train_iwae(
         num_clusters_probs, init_mean_1, std_1, mixture_probs, means_2, stds_2, obs_std,
         true_mean_1,
-        num_iterations, iwae_num_samples, iwae_num_particles, gradient_estimator, learning_rate
+        num_iterations, vae_num_samples, 1, gradient_estimator, learning_rate
     )
     for [data, filename] in zip(
-        [iwae_relax_elbo_history, iwae_relax_mean_1_history],
-        ['iwae_relax_elbo_history', 'iwae_relax_mean_1_history']
+        [vae_relax_elbo_history, vae_relax_mean_1_history],
+        ['vae_relax_elbo_history', 'vae_relax_mean_1_history']
     ):
         save_data(filename, data)
         print('Saved to {}'.format(filename))
+
+    # IWAE
+    iwae_num_samples = 100
+    for iwae_num_particles in [2, 5, 10]:
+        ## Reinforce
+        gradient_estimator = 'reinforce'
+
+        iwae_reinforce_elbo_history, iwae_reinforce, iwae_reinforce_mean_1_history = train_iwae(
+            num_clusters_probs, init_mean_1, std_1, mixture_probs, means_2, stds_2, obs_std,
+            true_mean_1,
+            num_iterations, iwae_num_samples, iwae_num_particles, gradient_estimator, learning_rate
+        )
+        for [data, filename] in zip(
+            [iwae_reinforce_elbo_history, iwae_reinforce_mean_1_history],
+            ['iwae_{}_reinforce_elbo_history'.format(iwae_num_particles), 'iwae_{}_reinforce_mean_1_history'.format(iwae_num_particles)]
+        ):
+            save_data(filename, data)
+            print('Saved to {}'.format(filename))
+
+        ## VIMCO
+        gradient_estimator = 'vimco'
+
+        iwae_vimco_elbo_history, iwae_vimco, iwae_vimco_mean_1_history = train_iwae(
+            num_clusters_probs, init_mean_1, std_1, mixture_probs, means_2, stds_2, obs_std,
+            true_mean_1,
+            num_iterations, iwae_num_samples, iwae_num_particles, gradient_estimator, learning_rate
+        )
+        for [data, filename] in zip(
+            [iwae_vimco_elbo_history, iwae_vimco_mean_1_history],
+            ['iwae_{}_vimco_elbo_history'.format(iwae_num_particles), 'iwae_{}_vimco_mean_1_history'.format(iwae_num_particles)]
+        ):
+            save_data(filename, data)
+            print('Saved to {}'.format(filename))
+
+        ## Relax
+        gradient_estimator = 'relax'
+
+        iwae_relax_elbo_history, iwae_relax, iwae_relax_mean_1_history = train_iwae(
+            num_clusters_probs, init_mean_1, std_1, mixture_probs, means_2, stds_2, obs_std,
+            true_mean_1,
+            num_iterations, iwae_num_samples, iwae_num_particles, gradient_estimator, learning_rate
+        )
+        for [data, filename] in zip(
+            [iwae_relax_elbo_history, iwae_relax_mean_1_history],
+            ['iwae_{}_relax_elbo_history'.format(iwae_num_particles), 'iwae_{}_relax_mean_1_history'.format(iwae_num_particles)]
+        ):
+            save_data(filename, data)
+            print('Saved to {}'.format(filename))
 
     # WS
     theta_learning_rate = learning_rate
@@ -1147,7 +1163,7 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(description='GMM open universe')
     parser.add_argument('--cuda', action='store_true', default=False,
-                        help='disables CUDA use')
+                        help='enables CUDA use')
     parser.add_argument('--seed', type=int, default=1, metavar='S',
                         help='random seed (default: 1)')
     args = parser.parse_args()
