@@ -727,7 +727,7 @@ def train_iwae(
         elbo_history[i] = elbo.data[0]
         mean_1_history[i] = iwae.generative_network.mean_1.data[0]
         if i % 100 == 0:
-            print('Iteration {}'.format(i))
+            print('Iteration {}: mean_1 = {}'.format(i, mean_1_history[i]))
 
     return elbo_history, iwae, mean_1_history
 
