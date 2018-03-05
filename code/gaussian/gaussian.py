@@ -367,6 +367,8 @@ def train_rws(
 
 
 def main():
+    num_repeats = 10
+
     true_prior_mean = 0
     true_prior_std = 1
     true_obs_std = 1
@@ -383,200 +385,137 @@ def main():
 
     true_multiplier, true_offset, true_std = get_proposal_params(true_prior_mean, true_prior_std, true_obs_std)
 
-    # IWAE
-    iwae_num_samples = 10
-    iwae_num_particles = 10
+    for repeat_idx in range(num_repeats):
+        print('Repeat {}'.format(repeat_idx))
+        # IWAE
+        iwae_num_samples = 10
+        iwae_num_particles = 10
 
-    iwae_prior_mean_history, iwae_obs_std_history, iwae_multiplier_history, iwae_offset_history, iwae_std_history, iwae_loss_history = train_iwae(
-        init_prior_mean, prior_std, init_obs_std, init_multiplier, init_offset, init_std,
-        true_prior_mean, true_prior_std,  true_obs_std,
-        num_iterations, learning_rate, iwae_num_samples, iwae_num_particles
-    )
-    iwae_true_multiplier_history, iwae_true_offset_history, iwae_true_std_history = get_proposal_params(
-        iwae_prior_mean_history, true_prior_std, iwae_obs_std_history
-    )
+        iwae_prior_mean_history, iwae_obs_std_history, iwae_multiplier_history, iwae_offset_history, iwae_std_history, iwae_loss_history = train_iwae(
+            init_prior_mean, prior_std, init_obs_std, init_multiplier, init_offset, init_std,
+            true_prior_mean, true_prior_std,  true_obs_std,
+            num_iterations, learning_rate, iwae_num_samples, iwae_num_particles
+        )
+        iwae_true_multiplier_history, iwae_true_offset_history, iwae_true_std_history = get_proposal_params(
+            iwae_prior_mean_history, true_prior_std, iwae_obs_std_history
+        )
 
-    for [data, filename] in zip(
-        [iwae_prior_mean_history, iwae_obs_std_history, iwae_multiplier_history, iwae_offset_history, iwae_std_history, iwae_loss_history, iwae_true_multiplier_history, iwae_true_offset_history, iwae_true_std_history],
-        ['iwae_prior_mean_history.npy', 'iwae_obs_std_history.npy', 'iwae_multiplier_history.npy', 'iwae_offset_history.npy', 'iwae_std_history.npy', 'iwae_loss_history.npy', 'iwae_true_multiplier_history.npy', 'iwae_true_offset_history.npy', 'iwae_true_std_history.npy']
-    ):
-        np.save(filename, data)
-        print('Saved to {}'.format(filename))
-
-
-    # RWS
-    rws_num_particles = 10
-    theta_learning_rate = learning_rate
-    phi_learning_rate = learning_rate
-
-    sleep_phi = True
-    wake_phi = False
-    ws_prior_mean_history, ws_obs_std_history, ws_multiplier_history, ws_offset_history, ws_std_history, ws_wake_theta_loss_history, ws_sleep_phi_loss_history, _, _ = train_rws(
-        init_prior_mean, prior_std, init_obs_std, init_multiplier, init_offset, init_std,
-        true_prior_mean, true_prior_std,  true_obs_std,
-        sleep_phi, wake_phi, rws_num_particles,
-        theta_learning_rate, phi_learning_rate,
-        num_iterations
-    )
-    ws_true_multiplier_history, ws_true_offset_history, ws_true_std_history = get_proposal_params(
-        ws_prior_mean_history, true_prior_std, ws_obs_std_history
-    )
-    for [data, filename] in zip(
-        [ws_prior_mean_history, ws_obs_std_history, ws_multiplier_history, ws_offset_history, ws_std_history, ws_wake_theta_loss_history, ws_sleep_phi_loss_history, ws_true_multiplier_history, ws_true_offset_history, ws_true_std_history],
-        ['ws_prior_mean_history.npy', 'ws_obs_std_history.npy', 'ws_multiplier_history.npy', 'ws_offset_history.npy', 'ws_std_history.npy', 'ws_wake_theta_loss_history.npy', 'ws_sleep_phi_loss_history.npy', 'ws_true_multiplier_history.npy', 'ws_true_offset_history.npy', 'ws_true_std_history.npy']
-    ):
-        np.save(filename, data)
-        print('Saved to {}'.format(filename))
+        for [data, filename] in zip(
+            [iwae_prior_mean_history, iwae_obs_std_history, iwae_multiplier_history, iwae_offset_history, iwae_std_history, iwae_loss_history, iwae_true_multiplier_history, iwae_true_offset_history, iwae_true_std_history],
+            ['iwae_prior_mean_history_{}.npy'.format(repeat_idx), 'iwae_obs_std_history_{}.npy'.format(repeat_idx), 'iwae_multiplier_history_{}.npy'.format(repeat_idx), 'iwae_offset_history_{}.npy'.format(repeat_idx), 'iwae_std_history_{}.npy'.format(repeat_idx), 'iwae_loss_history_{}.npy'.format(repeat_idx), 'iwae_true_multiplier_history_{}.npy'.format(repeat_idx), 'iwae_true_offset_history_{}.npy'.format(repeat_idx), 'iwae_true_std_history_{}.npy'.format(repeat_idx)]
+        ):
+            np.save(filename, data)
+            print('Saved to {}'.format(filename))
 
 
-    sleep_phi = False
-    wake_phi = True
-    ww_prior_mean_history, ww_obs_std_history, ww_multiplier_history, ww_offset_history, ww_std_history, ww_wake_theta_loss_history, _, ww_wake_phi_loss_history, _ = train_rws(
-        init_prior_mean, prior_std, init_obs_std, init_multiplier, init_offset, init_std,
-        true_prior_mean, true_prior_std,  true_obs_std,
-        sleep_phi, wake_phi, rws_num_particles,
-        theta_learning_rate, phi_learning_rate,
-        num_iterations
-    )
-    ww_true_multiplier_history, ww_true_offset_history, ww_true_std_history = get_proposal_params(
-        ww_prior_mean_history, true_prior_std, ww_obs_std_history
-    )
-    for [data, filename] in zip(
-        [ww_prior_mean_history, ww_obs_std_history, ww_multiplier_history, ww_offset_history, ww_std_history, ww_wake_theta_loss_history, ww_wake_phi_loss_history, ww_true_multiplier_history, ww_true_offset_history, ww_true_std_history],
-        ['ww_prior_mean_history.npy', 'ww_obs_std_history.npy', 'ww_multiplier_history.npy', 'ww_offset_history.npy', 'ww_std_history.npy', 'ww_wake_theta_loss_history.npy', 'ww_wake_phi_loss_history.npy', 'ww_true_multiplier_history.npy', 'ww_true_offset_history.npy', 'ww_true_std_history.npy']
-    ):
-        np.save(filename, data)
-        print('Saved to {}'.format(filename))
+        # RWS
+        rws_num_particles = 10
+        theta_learning_rate = learning_rate
+        phi_learning_rate = learning_rate
 
-    sleep_phi = True
-    wake_phi = True
-    wsw_prior_mean_history, wsw_obs_std_history, wsw_multiplier_history, wsw_offset_history, wsw_std_history, wsw_wake_theta_loss_history, wsw_sleep_phi_loss_history, wsw_wake_phi_loss_history, _ = train_rws(
-        init_prior_mean, prior_std, init_obs_std, init_multiplier, init_offset, init_std,
-        true_prior_mean, true_prior_std,  true_obs_std,
-        sleep_phi, wake_phi, rws_num_particles,
-        theta_learning_rate, phi_learning_rate,
-        num_iterations
-    )
-    wsw_true_multiplier_history, wsw_true_offset_history, wsw_true_std_history = get_proposal_params(
-        wsw_prior_mean_history, true_prior_std, wsw_obs_std_history
-    )
-    for [data, filename] in zip(
-        [wsw_prior_mean_history, wsw_obs_std_history, wsw_multiplier_history, wsw_offset_history, wsw_std_history, wsw_wake_theta_loss_history, wsw_sleep_phi_loss_history, wsw_wake_phi_loss_history, wsw_true_multiplier_history, wsw_true_offset_history, wsw_true_std_history],
-        ['wsw_prior_mean_history.npy', 'wsw_obs_std_history.npy', 'wsw_multiplier_history.npy', 'wsw_offset_history.npy', 'wsw_std_history.npy', 'wsw_wake_theta_loss_history.npy', 'wsw_sleep_phi_loss_history.npy', 'wsw_wake_phi_loss_history.npy', 'wsw_true_multiplier_history.npy', 'wsw_true_offset_history.npy', 'wsw_true_std_history.npy']
-    ):
-        np.save(filename, data)
-        print('Saved to {}'.format(filename))
+        sleep_phi = True
+        wake_phi = False
+        ws_prior_mean_history, ws_obs_std_history, ws_multiplier_history, ws_offset_history, ws_std_history, ws_wake_theta_loss_history, ws_sleep_phi_loss_history, _, _ = train_rws(
+            init_prior_mean, prior_std, init_obs_std, init_multiplier, init_offset, init_std,
+            true_prior_mean, true_prior_std,  true_obs_std,
+            sleep_phi, wake_phi, rws_num_particles,
+            theta_learning_rate, phi_learning_rate,
+            num_iterations
+        )
+        ws_true_multiplier_history, ws_true_offset_history, ws_true_std_history = get_proposal_params(
+            ws_prior_mean_history, true_prior_std, ws_obs_std_history
+        )
+        for [data, filename] in zip(
+            [ws_prior_mean_history, ws_obs_std_history, ws_multiplier_history, ws_offset_history, ws_std_history, ws_wake_theta_loss_history, ws_sleep_phi_loss_history, ws_true_multiplier_history, ws_true_offset_history, ws_true_std_history],
+            ['ws_prior_mean_history_{}.npy'.format(repeat_idx), 'ws_obs_std_history_{}.npy'.format(repeat_idx), 'ws_multiplier_history_{}.npy'.format(repeat_idx), 'ws_offset_history_{}.npy'.format(repeat_idx), 'ws_std_history_{}.npy'.format(repeat_idx), 'ws_wake_theta_loss_history_{}.npy'.format(repeat_idx), 'ws_sleep_phi_loss_history_{}.npy'.format(repeat_idx), 'ws_true_multiplier_history_{}.npy'.format(repeat_idx), 'ws_true_offset_history_{}.npy'.format(repeat_idx), 'ws_true_std_history_{}.npy'.format(repeat_idx)]
+        ):
+            np.save(filename, data)
+            print('Saved to {}'.format(filename))
 
-    sleep_phi = False
-    wake_phi = True
-    anneal_wake_phi = True
-    init_anneal_factor = 0
-    ess_threshold = 0.90
 
-    waw_prior_mean_history, waw_obs_std_history, waw_multiplier_history, waw_offset_history, waw_std_history, waw_wake_theta_loss_history, _, waw_wake_phi_loss_history, waw_anneal_factor_history = train_rws(
-        init_prior_mean, prior_std, init_obs_std, init_multiplier, init_offset, init_std,
-        true_prior_mean, true_prior_std,  true_obs_std,
-        sleep_phi, wake_phi, rws_num_particles,
-        theta_learning_rate, phi_learning_rate,
-        num_iterations, anneal_wake_phi, init_anneal_factor, ess_threshold
-    )
-    waw_true_multiplier_history, waw_true_offset_history, waw_true_std_history = get_proposal_params(
-        waw_prior_mean_history, true_prior_std, waw_obs_std_history
-    )
-    for [data, filename] in zip(
-        [waw_prior_mean_history, waw_obs_std_history, waw_multiplier_history, waw_offset_history, waw_std_history, waw_wake_theta_loss_history, waw_wake_phi_loss_history, waw_anneal_factor_history, waw_true_multiplier_history, waw_true_offset_history, waw_true_std_history],
-        ['waw_prior_mean_history.npy', 'waw_obs_std_history.npy', 'waw_multiplier_history.npy', 'waw_offset_history.npy', 'waw_std_history.npy', 'waw_wake_theta_loss_history.npy', 'waw_wake_phi_loss_history.npy', 'waw_anneal_factor_history.npy', 'waw_true_multiplier_history.npy', 'waw_true_offset_history.npy', 'waw_true_std_history.npy']
-    ):
-        np.save(filename, data)
-        print('Saved to {}'.format(filename))
+        sleep_phi = False
+        wake_phi = True
+        ww_prior_mean_history, ww_obs_std_history, ww_multiplier_history, ww_offset_history, ww_std_history, ww_wake_theta_loss_history, _, ww_wake_phi_loss_history, _ = train_rws(
+            init_prior_mean, prior_std, init_obs_std, init_multiplier, init_offset, init_std,
+            true_prior_mean, true_prior_std,  true_obs_std,
+            sleep_phi, wake_phi, rws_num_particles,
+            theta_learning_rate, phi_learning_rate,
+            num_iterations
+        )
+        ww_true_multiplier_history, ww_true_offset_history, ww_true_std_history = get_proposal_params(
+            ww_prior_mean_history, true_prior_std, ww_obs_std_history
+        )
+        for [data, filename] in zip(
+            [ww_prior_mean_history, ww_obs_std_history, ww_multiplier_history, ww_offset_history, ww_std_history, ww_wake_theta_loss_history, ww_wake_phi_loss_history, ww_true_multiplier_history, ww_true_offset_history, ww_true_std_history],
+            ['ww_prior_mean_history_{}.npy'.format(repeat_idx), 'ww_obs_std_history_{}.npy'.format(repeat_idx), 'ww_multiplier_history_{}.npy'.format(repeat_idx), 'ww_offset_history_{}.npy'.format(repeat_idx), 'ww_std_history_{}.npy'.format(repeat_idx), 'ww_wake_theta_loss_history_{}.npy'.format(repeat_idx), 'ww_wake_phi_loss_history_{}.npy'.format(repeat_idx), 'ww_true_multiplier_history_{}.npy'.format(repeat_idx), 'ww_true_offset_history_{}.npy'.format(repeat_idx), 'ww_true_std_history_{}.npy'.format(repeat_idx)]
+        ):
+            np.save(filename, data)
+            print('Saved to {}'.format(filename))
 
-    sleep_phi = True
-    wake_phi = True
-    anneal_wake_phi = True
-    init_anneal_factor = 0
-    ess_threshold = 0.90
+        sleep_phi = True
+        wake_phi = True
+        wsw_prior_mean_history, wsw_obs_std_history, wsw_multiplier_history, wsw_offset_history, wsw_std_history, wsw_wake_theta_loss_history, wsw_sleep_phi_loss_history, wsw_wake_phi_loss_history, _ = train_rws(
+            init_prior_mean, prior_std, init_obs_std, init_multiplier, init_offset, init_std,
+            true_prior_mean, true_prior_std,  true_obs_std,
+            sleep_phi, wake_phi, rws_num_particles,
+            theta_learning_rate, phi_learning_rate,
+            num_iterations
+        )
+        wsw_true_multiplier_history, wsw_true_offset_history, wsw_true_std_history = get_proposal_params(
+            wsw_prior_mean_history, true_prior_std, wsw_obs_std_history
+        )
+        for [data, filename] in zip(
+            [wsw_prior_mean_history, wsw_obs_std_history, wsw_multiplier_history, wsw_offset_history, wsw_std_history, wsw_wake_theta_loss_history, wsw_sleep_phi_loss_history, wsw_wake_phi_loss_history, wsw_true_multiplier_history, wsw_true_offset_history, wsw_true_std_history],
+            ['wsw_prior_mean_history_{}.npy'.format(repeat_idx), 'wsw_obs_std_history_{}.npy'.format(repeat_idx), 'wsw_multiplier_history_{}.npy'.format(repeat_idx), 'wsw_offset_history_{}.npy'.format(repeat_idx), 'wsw_std_history_{}.npy'.format(repeat_idx), 'wsw_wake_theta_loss_history_{}.npy'.format(repeat_idx), 'wsw_sleep_phi_loss_history_{}.npy'.format(repeat_idx), 'wsw_wake_phi_loss_history_{}.npy'.format(repeat_idx), 'wsw_true_multiplier_history_{}.npy'.format(repeat_idx), 'wsw_true_offset_history_{}.npy'.format(repeat_idx), 'wsw_true_std_history_{}.npy'.format(repeat_idx)]
+        ):
+            np.save(filename, data)
+            print('Saved to {}'.format(filename))
 
-    wsaw_prior_mean_history, wsaw_obs_std_history, wsaw_multiplier_history, wsaw_offset_history, wsaw_std_history, wsaw_wake_theta_loss_history, wsaw_sleep_phi_loss_history, wsaw_wake_phi_loss_history, wsaw_anneal_factor_history = train_rws(
-        init_prior_mean, prior_std, init_obs_std, init_multiplier, init_offset, init_std,
-        true_prior_mean, true_prior_std,  true_obs_std,
-        sleep_phi, wake_phi, rws_num_particles,
-        theta_learning_rate, phi_learning_rate,
-        num_iterations, anneal_wake_phi, init_anneal_factor, ess_threshold
-    )
-    wsaw_true_multiplier_history, wsaw_true_offset_history, wsaw_true_std_history = get_proposal_params(
-        wsaw_prior_mean_history, true_prior_std, wsaw_obs_std_history
-    )
-    for [data, filename] in zip(
-        [wsaw_prior_mean_history, wsaw_obs_std_history, wsaw_multiplier_history, wsaw_offset_history, wsaw_std_history, wsaw_wake_theta_loss_history, wsaw_sleep_phi_loss_history, wsaw_wake_phi_loss_history, wsaw_anneal_factor_history, wsaw_true_multiplier_history, wsaw_true_offset_history, wsaw_true_std_history],
-        ['wsaw_prior_mean_history.npy', 'wsaw_obs_std_history.npy', 'wsaw_multiplier_history.npy', 'wsaw_offset_history.npy', 'wsaw_std_history.npy', 'wsaw_wake_theta_loss_history.npy', 'wsaw_sleep_phi_loss_history.npy', 'wsaw_wake_phi_loss_history.npy', 'wsaw_anneal_factor_history.npy', 'wsaw_true_multiplier_history.npy', 'wsaw_true_offset_history.npy', 'wsaw_true_std_history.npy']
-    ):
-        np.save(filename, data)
-        print('Saved to {}'.format(filename))
+        sleep_phi = False
+        wake_phi = True
+        anneal_wake_phi = True
+        init_anneal_factor = 0
+        ess_threshold = 0.90
 
-    # Plotting
-    fig, axs = plt.subplots(5, 1, sharex=True)
+        waw_prior_mean_history, waw_obs_std_history, waw_multiplier_history, waw_offset_history, waw_std_history, waw_wake_theta_loss_history, _, waw_wake_phi_loss_history, waw_anneal_factor_history = train_rws(
+            init_prior_mean, prior_std, init_obs_std, init_multiplier, init_offset, init_std,
+            true_prior_mean, true_prior_std,  true_obs_std,
+            sleep_phi, wake_phi, rws_num_particles,
+            theta_learning_rate, phi_learning_rate,
+            num_iterations, anneal_wake_phi, init_anneal_factor, ess_threshold
+        )
+        waw_true_multiplier_history, waw_true_offset_history, waw_true_std_history = get_proposal_params(
+            waw_prior_mean_history, true_prior_std, waw_obs_std_history
+        )
+        for [data, filename] in zip(
+            [waw_prior_mean_history, waw_obs_std_history, waw_multiplier_history, waw_offset_history, waw_std_history, waw_wake_theta_loss_history, waw_wake_phi_loss_history, waw_anneal_factor_history, waw_true_multiplier_history, waw_true_offset_history, waw_true_std_history],
+            ['waw_prior_mean_history_{}.npy'.format(repeat_idx), 'waw_obs_std_history_{}.npy'.format(repeat_idx), 'waw_multiplier_history_{}.npy'.format(repeat_idx), 'waw_offset_history_{}.npy'.format(repeat_idx), 'waw_std_history_{}.npy'.format(repeat_idx), 'waw_wake_theta_loss_history_{}.npy'.format(repeat_idx), 'waw_wake_phi_loss_history_{}.npy'.format(repeat_idx), 'waw_anneal_factor_history_{}.npy'.format(repeat_idx), 'waw_true_multiplier_history_{}.npy'.format(repeat_idx), 'waw_true_offset_history_{}.npy'.format(repeat_idx), 'waw_true_std_history_{}.npy'.format(repeat_idx)]
+        ):
+            np.save(filename, data)
+            print('Saved to {}'.format(filename))
 
-    fig.set_size_inches(3.25, 4)
+        sleep_phi = True
+        wake_phi = True
+        anneal_wake_phi = True
+        init_anneal_factor = 0
+        ess_threshold = 0.90
 
-    for ax in axs:
-        ax.spines['top'].set_visible(False)
-        ax.spines['right'].set_visible(False)
-
-    # axs[0].set_title('Generative network parameters')
-    axs[0].plot(iwae_prior_mean_history, color='black', linestyle=':', label='iwae-{}'.format(iwae_num_particles))
-    axs[0].plot(ws_prior_mean_history, color='black', linestyle='-.', label='ws-{}'.format(rws_num_particles))
-    axs[0].plot(ww_prior_mean_history, color='0.8', linestyle='-', label='ww-{}'.format(rws_num_particles))
-    axs[0].plot(wsw_prior_mean_history, color='0.4', linestyle='-', label='wsw-{}'.format(rws_num_particles))
-    axs[0].plot(waw_prior_mean_history, color='0.8', linestyle='--', label='waw-{}'.format(rws_num_particles))
-    axs[0].plot(wsaw_prior_mean_history, color='0.4', linestyle='--', label='wsaw-{}'.format(rws_num_particles))
-    axs[0].axhline(true_prior_mean, color='black', label='true')
-    axs[0].set_ylabel('$\mu_0$')
-
-    axs[1].plot(iwae_obs_std_history, color='black', linestyle=':', label='iwae-{}'.format(iwae_num_particles))
-    axs[1].plot(ws_obs_std_history, color='black', linestyle='-.', label='ws-{}'.format(rws_num_particles))
-    axs[1].plot(ww_obs_std_history, color='0.8', linestyle='-', label='ww-{}'.format(rws_num_particles))
-    axs[1].plot(wsw_obs_std_history, color='0.4', linestyle='-', label='wsw-{}'.format(rws_num_particles))
-    axs[1].plot(waw_obs_std_history, color='0.8', linestyle='--', label='waw-{}'.format(rws_num_particles))
-    axs[1].plot(wsaw_obs_std_history, color='0.4', linestyle='--', label='wsaw-{}'.format(rws_num_particles))
-    axs[1].axhline(true_obs_std, color='black', label='true')
-    axs[1].set_ylabel('$\sigma$')
-    # axs[1].set_xlabel('Iteration')
-
-    # axs[2].set_title('Inference network parameters')
-    axs[2].plot(iwae_multiplier_history, color='black', linestyle=':', label='iwae-{}'.format(iwae_num_particles))
-    axs[2].plot(ws_multiplier_history, color='black', linestyle='-.', label='ws-{}'.format(rws_num_particles))
-    axs[2].plot(ww_multiplier_history, color='0.8', linestyle='-', label='ww-{}'.format(rws_num_particles))
-    axs[2].plot(wsw_multiplier_history, color='0.4', linestyle='-', label='wsw-{}'.format(rws_num_particles))
-    axs[2].plot(waw_multiplier_history, color='0.8', linestyle='--', label='waw-{}'.format(rws_num_particles))
-    axs[2].plot(wsaw_multiplier_history, color='0.4', linestyle='--', label='wsaw-{}'.format(rws_num_particles))
-    axs[2].axhline(true_multiplier, color='black', label='true')
-    axs[2].set_ylabel('$a$')
-
-    axs[3].plot(iwae_offset_history, color='black', linestyle=':', label='iwae-{}'.format(iwae_num_particles))
-    axs[3].plot(ws_offset_history, color='black', linestyle='-.', label='ws-{}'.format(rws_num_particles))
-    axs[3].plot(ww_offset_history, color='0.8', linestyle='-', label='ww-{}'.format(rws_num_particles))
-    axs[3].plot(wsw_offset_history, color='0.4', linestyle='-', label='wsw-{}'.format(rws_num_particles))
-    axs[3].plot(waw_offset_history, color='0.8', linestyle='--', label='waw-{}'.format(rws_num_particles))
-    axs[3].plot(wsaw_offset_history, color='0.4', linestyle='--', label='wsaw-{}'.format(rws_num_particles))
-    axs[3].axhline(true_offset, color='black', label='true')
-    axs[3].set_ylabel('$b$')
-
-    axs[4].plot(iwae_std_history, color='black', linestyle=':', label='iwae-{}'.format(iwae_num_particles))
-    axs[4].plot(ws_std_history, color='black', linestyle='-.', label='ws-{}'.format(rws_num_particles))
-    axs[4].plot(ww_std_history, color='0.8', linestyle='-', label='ww-{}'.format(rws_num_particles))
-    axs[4].plot(wsw_std_history, color='0.4', linestyle='-', label='wsw-{}'.format(rws_num_particles))
-    axs[4].plot(waw_std_history, color='0.8', linestyle='--', label='waw-{}'.format(rws_num_particles))
-    axs[4].plot(wsaw_std_history, color='0.4', linestyle='--', label='wsaw-{}'.format(rws_num_particles))
-    axs[4].axhline(true_std, color='black', label='true')
-    axs[4].set_ylabel('$c$')
-    axs[4].set_xlabel('Iteration')
-
-    axs[-1].legend(loc='upper center', bbox_to_anchor=(0.5, -0.6), ncol=4)
-    fig.tight_layout()
-
-    filename = 'gaussian.pdf'
-    fig.savefig(filename, bbox_inches='tight')
-    print('Saved to {}'.format(filename))
+        wsaw_prior_mean_history, wsaw_obs_std_history, wsaw_multiplier_history, wsaw_offset_history, wsaw_std_history, wsaw_wake_theta_loss_history, wsaw_sleep_phi_loss_history, wsaw_wake_phi_loss_history, wsaw_anneal_factor_history = train_rws(
+            init_prior_mean, prior_std, init_obs_std, init_multiplier, init_offset, init_std,
+            true_prior_mean, true_prior_std,  true_obs_std,
+            sleep_phi, wake_phi, rws_num_particles,
+            theta_learning_rate, phi_learning_rate,
+            num_iterations, anneal_wake_phi, init_anneal_factor, ess_threshold
+        )
+        wsaw_true_multiplier_history, wsaw_true_offset_history, wsaw_true_std_history = get_proposal_params(
+            wsaw_prior_mean_history, true_prior_std, wsaw_obs_std_history
+        )
+        for [data, filename] in zip(
+            [wsaw_prior_mean_history, wsaw_obs_std_history, wsaw_multiplier_history, wsaw_offset_history, wsaw_std_history, wsaw_wake_theta_loss_history, wsaw_sleep_phi_loss_history, wsaw_wake_phi_loss_history, wsaw_anneal_factor_history, wsaw_true_multiplier_history, wsaw_true_offset_history, wsaw_true_std_history],
+            ['wsaw_prior_mean_history_{}.npy'.format(repeat_idx), 'wsaw_obs_std_history_{}.npy'.format(repeat_idx), 'wsaw_multiplier_history_{}.npy'.format(repeat_idx), 'wsaw_offset_history_{}.npy'.format(repeat_idx), 'wsaw_std_history_{}.npy'.format(repeat_idx), 'wsaw_wake_theta_loss_history_{}.npy'.format(repeat_idx), 'wsaw_sleep_phi_loss_history_{}.npy'.format(repeat_idx), 'wsaw_wake_phi_loss_history_{}.npy'.format(repeat_idx), 'wsaw_anneal_factor_history_{}.npy'.format(repeat_idx), 'wsaw_true_multiplier_history_{}.npy'.format(repeat_idx), 'wsaw_true_offset_history_{}.npy'.format(repeat_idx), 'wsaw_true_std_history_{}.npy'.format(repeat_idx)]
+        ):
+            np.save(filename, data)
+            print('Saved to {}'.format(filename))
 
 
 if __name__ == '__main__':

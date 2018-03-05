@@ -25,7 +25,18 @@ def get_proposal_params(prior_mean, prior_std, obs_std):
     return multiplier, offset, posterior_std
 
 
+def plot_with_error_bars(ax, data, color, linestyle, label):
+    # the error bars turn out to be negligibly small
+    num_iterations = data.shape[1]
+    mean = np.mean(data, axis=0)
+    # std = np.std(data, axis=0)
+    ax.plot(mean, color=color, linestyle=linestyle, label=label)
+    # ax.fill_between(np.arange(num_iterations), mean - 3 * std, mean + 3 * std, color=color, alpha=0.3)
+    return ax
+
+
 def main():
+    num_repeats = 10
     true_prior_mean = 0
     true_prior_std = 1
     true_obs_std = 1
@@ -42,21 +53,90 @@ def main():
 
     true_multiplier, true_offset, true_std = get_proposal_params(true_prior_mean, true_prior_std, true_obs_std)
 
-    # IWAE
-    iwae_num_particles = 10
-    iwae_prior_mean_history, iwae_obs_std_history, iwae_multiplier_history, iwae_offset_history, iwae_std_history, iwae_loss_history, iwae_true_multiplier_history, iwae_true_offset_history, iwae_true_std_history = np.load('iwae_prior_mean_history.npy'), np.load('iwae_obs_std_history.npy'), np.load('iwae_multiplier_history.npy'), np.load('iwae_offset_history.npy'), np.load('iwae_std_history.npy'), np.load('iwae_loss_history.npy'), np.load('iwae_true_multiplier_history.npy'), np.load('iwae_true_offset_history.npy'), np.load('iwae_true_std_history.npy')
+    iwae_prior_mean_history = np.zeros([num_repeats, num_iterations])
+    iwae_obs_std_history = np.zeros([num_repeats, num_iterations])
+    iwae_multiplier_history = np.zeros([num_repeats, num_iterations])
+    iwae_offset_history = np.zeros([num_repeats, num_iterations])
+    iwae_std_history = np.zeros([num_repeats, num_iterations])
+    iwae_loss_history = np.zeros([num_repeats, num_iterations])
+    iwae_true_multiplier_history = np.zeros([num_repeats, num_iterations])
+    iwae_true_offset_history = np.zeros([num_repeats, num_iterations])
+    iwae_true_std_history = np.zeros([num_repeats, num_iterations])
 
-    # RWS
-    rws_num_particles = 10
-    ws_prior_mean_history, ws_obs_std_history, ws_multiplier_history, ws_offset_history, ws_std_history, ws_wake_theta_loss_history, ws_sleep_phi_loss_history, ws_true_multiplier_history, ws_true_offset_history, ws_true_std_history = np.load('ws_prior_mean_history.npy'), np.load('ws_obs_std_history.npy'), np.load('ws_multiplier_history.npy'), np.load('ws_offset_history.npy'), np.load('ws_std_history.npy'), np.load('ws_wake_theta_loss_history.npy'), np.load('ws_sleep_phi_loss_history.npy'), np.load('ws_true_multiplier_history.npy'), np.load('ws_true_offset_history.npy'), np.load('ws_true_std_history.npy')
+    ws_prior_mean_history = np.zeros([num_repeats, num_iterations])
+    ws_obs_std_history = np.zeros([num_repeats, num_iterations])
+    ws_multiplier_history = np.zeros([num_repeats, num_iterations])
+    ws_offset_history = np.zeros([num_repeats, num_iterations])
+    ws_std_history = np.zeros([num_repeats, num_iterations])
+    ws_wake_theta_loss_history = np.zeros([num_repeats, num_iterations])
+    ws_sleep_phi_loss_history = np.zeros([num_repeats, num_iterations])
+    ws_true_multiplier_history = np.zeros([num_repeats, num_iterations])
+    ws_true_offset_history = np.zeros([num_repeats, num_iterations])
+    ws_true_std_history = np.zeros([num_repeats, num_iterations])
 
-    ww_prior_mean_history, ww_obs_std_history, ww_multiplier_history, ww_offset_history, ww_std_history, ww_wake_theta_loss_history, ww_wake_phi_loss_history, ww_true_multiplier_history, ww_true_offset_history, ww_true_std_history = np.load('ww_prior_mean_history.npy'), np.load('ww_obs_std_history.npy'), np.load('ww_multiplier_history.npy'), np.load('ww_offset_history.npy'), np.load('ww_std_history.npy'), np.load('ww_wake_theta_loss_history.npy'), np.load('ww_wake_phi_loss_history.npy'), np.load('ww_true_multiplier_history.npy'), np.load('ww_true_offset_history.npy'), np.load('ww_true_std_history.npy')
+    ww_prior_mean_history = np.zeros([num_repeats, num_iterations])
+    ww_obs_std_history = np.zeros([num_repeats, num_iterations])
+    ww_multiplier_history = np.zeros([num_repeats, num_iterations])
+    ww_offset_history = np.zeros([num_repeats, num_iterations])
+    ww_std_history = np.zeros([num_repeats, num_iterations])
+    ww_wake_theta_loss_history = np.zeros([num_repeats, num_iterations])
+    ww_wake_phi_loss_history = np.zeros([num_repeats, num_iterations])
+    ww_true_multiplier_history = np.zeros([num_repeats, num_iterations])
+    ww_true_offset_history = np.zeros([num_repeats, num_iterations])
+    ww_true_std_history = np.zeros([num_repeats, num_iterations])
 
-    wsw_prior_mean_history, wsw_obs_std_history, wsw_multiplier_history, wsw_offset_history, wsw_std_history, wsw_wake_theta_loss_history, wsw_sleep_phi_loss_history, wsw_wake_phi_loss_history, wsw_true_multiplier_history, wsw_true_offset_history, wsw_true_std_history = np.load('wsw_prior_mean_history.npy'), np.load('wsw_obs_std_history.npy'), np.load('wsw_multiplier_history.npy'), np.load('wsw_offset_history.npy'), np.load('wsw_std_history.npy'), np.load('wsw_wake_theta_loss_history.npy'), np.load('wsw_sleep_phi_loss_history.npy'), np.load('wsw_wake_phi_loss_history.npy'), np.load('wsw_true_multiplier_history.npy'), np.load('wsw_true_offset_history.npy'), np.load('wsw_true_std_history.npy')
+    wsw_prior_mean_history = np.zeros([num_repeats, num_iterations])
+    wsw_obs_std_history = np.zeros([num_repeats, num_iterations])
+    wsw_multiplier_history = np.zeros([num_repeats, num_iterations])
+    wsw_offset_history = np.zeros([num_repeats, num_iterations])
+    wsw_std_history = np.zeros([num_repeats, num_iterations])
+    wsw_wake_theta_loss_history = np.zeros([num_repeats, num_iterations])
+    wsw_sleep_phi_loss_history = np.zeros([num_repeats, num_iterations])
+    wsw_wake_phi_loss_history = np.zeros([num_repeats, num_iterations])
+    wsw_true_multiplier_history = np.zeros([num_repeats, num_iterations])
+    wsw_true_offset_history = np.zeros([num_repeats, num_iterations])
+    wsw_true_std_history = np.zeros([num_repeats, num_iterations])
 
-    waw_prior_mean_history, waw_obs_std_history, waw_multiplier_history, waw_offset_history, waw_std_history, waw_wake_theta_loss_history, waw_wake_phi_loss_history, waw_anneal_factor_history, waw_true_multiplier_history, waw_true_offset_history, waw_true_std_history = np.load('waw_prior_mean_history.npy'), np.load('waw_obs_std_history.npy'), np.load('waw_multiplier_history.npy'), np.load('waw_offset_history.npy'), np.load('waw_std_history.npy'), np.load('waw_wake_theta_loss_history.npy'), np.load('waw_wake_phi_loss_history.npy'), np.load('waw_anneal_factor_history.npy'), np.load('waw_true_multiplier_history.npy'), np.load('waw_true_offset_history.npy'), np.load('waw_true_std_history.npy')
+    waw_prior_mean_history = np.zeros([num_repeats, num_iterations])
+    waw_obs_std_history = np.zeros([num_repeats, num_iterations])
+    waw_multiplier_history = np.zeros([num_repeats, num_iterations])
+    waw_offset_history = np.zeros([num_repeats, num_iterations])
+    waw_std_history = np.zeros([num_repeats, num_iterations])
+    waw_wake_theta_loss_history = np.zeros([num_repeats, num_iterations])
+    waw_wake_phi_loss_history = np.zeros([num_repeats, num_iterations])
+    waw_anneal_factor_history = np.zeros([num_repeats, num_iterations])
+    waw_true_multiplier_history = np.zeros([num_repeats, num_iterations])
+    waw_true_offset_history = np.zeros([num_repeats, num_iterations])
+    waw_true_std_history = np.zeros([num_repeats, num_iterations])
 
-    wsaw_prior_mean_history, wsaw_obs_std_history, wsaw_multiplier_history, wsaw_offset_history, wsaw_std_history, wsaw_wake_theta_loss_history, wsaw_wake_phi_loss_history, wsaw_anneal_factor_history, wsaw_true_multiplier_history, wsaw_true_offset_history, wsaw_true_std_history = np.load('wsaw_prior_mean_history.npy'), np.load('wsaw_obs_std_history.npy'), np.load('wsaw_multiplier_history.npy'), np.load('wsaw_offset_history.npy'), np.load('wsaw_std_history.npy'), np.load('wsaw_wake_theta_loss_history.npy'), np.load('wsaw_wake_phi_loss_history.npy'), np.load('wsaw_anneal_factor_history.npy'), np.load('wsaw_true_multiplier_history.npy'), np.load('wsaw_true_offset_history.npy'), np.load('wsaw_true_std_history.npy')
+    wsaw_prior_mean_history = np.zeros([num_repeats, num_iterations])
+    wsaw_obs_std_history = np.zeros([num_repeats, num_iterations])
+    wsaw_multiplier_history = np.zeros([num_repeats, num_iterations])
+    wsaw_offset_history = np.zeros([num_repeats, num_iterations])
+    wsaw_std_history = np.zeros([num_repeats, num_iterations])
+    wsaw_wake_theta_loss_history = np.zeros([num_repeats, num_iterations])
+    wsaw_wake_phi_loss_history = np.zeros([num_repeats, num_iterations])
+    wsaw_anneal_factor_history = np.zeros([num_repeats, num_iterations])
+    wsaw_true_multiplier_history = np.zeros([num_repeats, num_iterations])
+    wsaw_true_offset_history = np.zeros([num_repeats, num_iterations])
+    wsaw_true_std_history = np.zeros([num_repeats, num_iterations])
+
+    for repeat_idx in range(num_repeats):
+        # IWAE
+        iwae_num_particles = 10
+        iwae_prior_mean_history[repeat_idx], iwae_obs_std_history[repeat_idx], iwae_multiplier_history[repeat_idx], iwae_offset_history[repeat_idx], iwae_std_history[repeat_idx], iwae_loss_history[repeat_idx], iwae_true_multiplier_history[repeat_idx], iwae_true_offset_history[repeat_idx], iwae_true_std_history[repeat_idx] = np.load('iwae_prior_mean_history.npy'), np.load('iwae_obs_std_history.npy'), np.load('iwae_multiplier_history.npy'), np.load('iwae_offset_history.npy'), np.load('iwae_std_history.npy'), np.load('iwae_loss_history.npy'), np.load('iwae_true_multiplier_history.npy'), np.load('iwae_true_offset_history.npy'), np.load('iwae_true_std_history.npy')
+
+        # RWS
+        rws_num_particles = 10
+        ws_prior_mean_history[repeat_idx], ws_obs_std_history[repeat_idx], ws_multiplier_history[repeat_idx], ws_offset_history[repeat_idx], ws_std_history[repeat_idx], ws_wake_theta_loss_history[repeat_idx], ws_sleep_phi_loss_history[repeat_idx], ws_true_multiplier_history[repeat_idx], ws_true_offset_history[repeat_idx], ws_true_std_history[repeat_idx] = np.load('ws_prior_mean_history.npy'), np.load('ws_obs_std_history.npy'), np.load('ws_multiplier_history.npy'), np.load('ws_offset_history.npy'), np.load('ws_std_history.npy'), np.load('ws_wake_theta_loss_history.npy'), np.load('ws_sleep_phi_loss_history.npy'), np.load('ws_true_multiplier_history.npy'), np.load('ws_true_offset_history.npy'), np.load('ws_true_std_history.npy')
+
+        ww_prior_mean_history[repeat_idx], ww_obs_std_history[repeat_idx], ww_multiplier_history[repeat_idx], ww_offset_history[repeat_idx], ww_std_history[repeat_idx], ww_wake_theta_loss_history[repeat_idx], ww_wake_phi_loss_history[repeat_idx], ww_true_multiplier_history[repeat_idx], ww_true_offset_history[repeat_idx], ww_true_std_history[repeat_idx] = np.load('ww_prior_mean_history.npy'), np.load('ww_obs_std_history.npy'), np.load('ww_multiplier_history.npy'), np.load('ww_offset_history.npy'), np.load('ww_std_history.npy'), np.load('ww_wake_theta_loss_history.npy'), np.load('ww_wake_phi_loss_history.npy'), np.load('ww_true_multiplier_history.npy'), np.load('ww_true_offset_history.npy'), np.load('ww_true_std_history.npy')
+
+        wsw_prior_mean_history[repeat_idx], wsw_obs_std_history[repeat_idx], wsw_multiplier_history[repeat_idx], wsw_offset_history[repeat_idx], wsw_std_history[repeat_idx], wsw_wake_theta_loss_history[repeat_idx], wsw_sleep_phi_loss_history[repeat_idx], wsw_wake_phi_loss_history[repeat_idx], wsw_true_multiplier_history[repeat_idx], wsw_true_offset_history[repeat_idx], wsw_true_std_history[repeat_idx] = np.load('wsw_prior_mean_history.npy'), np.load('wsw_obs_std_history.npy'), np.load('wsw_multiplier_history.npy'), np.load('wsw_offset_history.npy'), np.load('wsw_std_history.npy'), np.load('wsw_wake_theta_loss_history.npy'), np.load('wsw_sleep_phi_loss_history.npy'), np.load('wsw_wake_phi_loss_history.npy'), np.load('wsw_true_multiplier_history.npy'), np.load('wsw_true_offset_history.npy'), np.load('wsw_true_std_history.npy')
+
+        waw_prior_mean_history[repeat_idx], waw_obs_std_history[repeat_idx], waw_multiplier_history[repeat_idx], waw_offset_history[repeat_idx], waw_std_history[repeat_idx], waw_wake_theta_loss_history[repeat_idx], waw_wake_phi_loss_history[repeat_idx], waw_anneal_factor_history[repeat_idx], waw_true_multiplier_history[repeat_idx], waw_true_offset_history[repeat_idx], waw_true_std_history[repeat_idx] = np.load('waw_prior_mean_history.npy'), np.load('waw_obs_std_history.npy'), np.load('waw_multiplier_history.npy'), np.load('waw_offset_history.npy'), np.load('waw_std_history.npy'), np.load('waw_wake_theta_loss_history.npy'), np.load('waw_wake_phi_loss_history.npy'), np.load('waw_anneal_factor_history.npy'), np.load('waw_true_multiplier_history.npy'), np.load('waw_true_offset_history.npy'), np.load('waw_true_std_history.npy')
+
+        wsaw_prior_mean_history[repeat_idx], wsaw_obs_std_history[repeat_idx], wsaw_multiplier_history[repeat_idx], wsaw_offset_history[repeat_idx], wsaw_std_history[repeat_idx], wsaw_wake_theta_loss_history[repeat_idx], wsaw_wake_phi_loss_history[repeat_idx], wsaw_anneal_factor_history[repeat_idx], wsaw_true_multiplier_history[repeat_idx], wsaw_true_offset_history[repeat_idx], wsaw_true_std_history[repeat_idx] = np.load('wsaw_prior_mean_history.npy'), np.load('wsaw_obs_std_history.npy'), np.load('wsaw_multiplier_history.npy'), np.load('wsaw_offset_history.npy'), np.load('wsaw_std_history.npy'), np.load('wsaw_wake_theta_loss_history.npy'), np.load('wsaw_wake_phi_loss_history.npy'), np.load('wsaw_anneal_factor_history.npy'), np.load('wsaw_true_multiplier_history.npy'), np.load('wsaw_true_offset_history.npy'), np.load('wsaw_true_std_history.npy')
 
     # Plotting
     fig, axs = plt.subplots(5, 1, sharex=True)
@@ -68,50 +148,50 @@ def main():
         ax.spines['right'].set_visible(False)
 
     # axs[0].set_title('Generative network parameters')
-    axs[0].plot(iwae_prior_mean_history, color='black', linestyle=':', label='iwae-{}'.format(iwae_num_particles))
-    axs[0].plot(ws_prior_mean_history, color='black', linestyle='-.', label='ws-{}'.format(rws_num_particles))
-    axs[0].plot(ww_prior_mean_history, color='0.8', linestyle='-', label='ww-{}'.format(rws_num_particles))
-    axs[0].plot(wsw_prior_mean_history, color='0.4', linestyle='-', label='wsw-{}'.format(rws_num_particles))
-    axs[0].plot(waw_prior_mean_history, color='0.8', linestyle='--', label='waw-{}'.format(rws_num_particles))
-    axs[0].plot(wsaw_prior_mean_history, color='0.4', linestyle='--', label='wsaw-{}'.format(rws_num_particles))
+    axs[0] = plot_with_error_bars(axs[0], iwae_prior_mean_history, color='black', linestyle=':', label='iwae-{}'.format(iwae_num_particles))
+    axs[0] = plot_with_error_bars(axs[0], ws_prior_mean_history, color='black', linestyle='-.', label='ws-{}'.format(rws_num_particles))
+    axs[0] = plot_with_error_bars(axs[0], ww_prior_mean_history, color='0.8', linestyle='-', label='ww-{}'.format(rws_num_particles))
+    axs[0] = plot_with_error_bars(axs[0], wsw_prior_mean_history, color='0.4', linestyle='-', label='wsw-{}'.format(rws_num_particles))
+    axs[0] = plot_with_error_bars(axs[0], waw_prior_mean_history, color='0.8', linestyle='--', label='waw-{}'.format(rws_num_particles))
+    axs[0] = plot_with_error_bars(axs[0], wsaw_prior_mean_history, color='0.4', linestyle='--', label='wsaw-{}'.format(rws_num_particles))
     axs[0].axhline(true_prior_mean, color='black', label='true')
     axs[0].set_ylabel('$\mu_0$')
 
-    axs[1].plot(iwae_obs_std_history, color='black', linestyle=':', label='iwae-{}'.format(iwae_num_particles))
-    axs[1].plot(ws_obs_std_history, color='black', linestyle='-.', label='ws-{}'.format(rws_num_particles))
-    axs[1].plot(ww_obs_std_history, color='0.8', linestyle='-', label='ww-{}'.format(rws_num_particles))
-    axs[1].plot(wsw_obs_std_history, color='0.4', linestyle='-', label='wsw-{}'.format(rws_num_particles))
-    axs[1].plot(waw_obs_std_history, color='0.8', linestyle='--', label='waw-{}'.format(rws_num_particles))
-    axs[1].plot(wsaw_obs_std_history, color='0.4', linestyle='--', label='wsaw-{}'.format(rws_num_particles))
+    axs[1] = plot_with_error_bars(axs[1], iwae_obs_std_history, color='black', linestyle=':', label='iwae-{}'.format(iwae_num_particles))
+    axs[1] = plot_with_error_bars(axs[1], ws_obs_std_history, color='black', linestyle='-.', label='ws-{}'.format(rws_num_particles))
+    axs[1] = plot_with_error_bars(axs[1], ww_obs_std_history, color='0.8', linestyle='-', label='ww-{}'.format(rws_num_particles))
+    axs[1] = plot_with_error_bars(axs[1], wsw_obs_std_history, color='0.4', linestyle='-', label='wsw-{}'.format(rws_num_particles))
+    axs[1] = plot_with_error_bars(axs[1], waw_obs_std_history, color='0.8', linestyle='--', label='waw-{}'.format(rws_num_particles))
+    axs[1] = plot_with_error_bars(axs[1], wsaw_obs_std_history, color='0.4', linestyle='--', label='wsaw-{}'.format(rws_num_particles))
     axs[1].axhline(true_obs_std, color='black', label='true')
     axs[1].set_ylabel('$\sigma$')
     # axs[1].set_xlabel('Iteration')
 
     # axs[2].set_title('Inference network parameters')
-    axs[2].plot(iwae_multiplier_history, color='black', linestyle=':', label='iwae-{}'.format(iwae_num_particles))
-    axs[2].plot(ws_multiplier_history, color='black', linestyle='-.', label='ws-{}'.format(rws_num_particles))
-    axs[2].plot(ww_multiplier_history, color='0.8', linestyle='-', label='ww-{}'.format(rws_num_particles))
-    axs[2].plot(wsw_multiplier_history, color='0.4', linestyle='-', label='wsw-{}'.format(rws_num_particles))
-    axs[2].plot(waw_multiplier_history, color='0.8', linestyle='--', label='waw-{}'.format(rws_num_particles))
-    axs[2].plot(wsaw_multiplier_history, color='0.4', linestyle='--', label='wsaw-{}'.format(rws_num_particles))
+    axs[2] = plot_with_error_bars(axs[2], iwae_multiplier_history, color='black', linestyle=':', label='iwae-{}'.format(iwae_num_particles))
+    axs[2] = plot_with_error_bars(axs[2], ws_multiplier_history, color='black', linestyle='-.', label='ws-{}'.format(rws_num_particles))
+    axs[2] = plot_with_error_bars(axs[2], ww_multiplier_history, color='0.8', linestyle='-', label='ww-{}'.format(rws_num_particles))
+    axs[2] = plot_with_error_bars(axs[2], wsw_multiplier_history, color='0.4', linestyle='-', label='wsw-{}'.format(rws_num_particles))
+    axs[2] = plot_with_error_bars(axs[2], waw_multiplier_history, color='0.8', linestyle='--', label='waw-{}'.format(rws_num_particles))
+    axs[2] = plot_with_error_bars(axs[2], wsaw_multiplier_history, color='0.4', linestyle='--', label='wsaw-{}'.format(rws_num_particles))
     axs[2].axhline(true_multiplier, color='black', label='true')
     axs[2].set_ylabel('$a$')
 
-    axs[3].plot(iwae_offset_history, color='black', linestyle=':', label='iwae-{}'.format(iwae_num_particles))
-    axs[3].plot(ws_offset_history, color='black', linestyle='-.', label='ws-{}'.format(rws_num_particles))
-    axs[3].plot(ww_offset_history, color='0.8', linestyle='-', label='ww-{}'.format(rws_num_particles))
-    axs[3].plot(wsw_offset_history, color='0.4', linestyle='-', label='wsw-{}'.format(rws_num_particles))
-    axs[3].plot(waw_offset_history, color='0.8', linestyle='--', label='waw-{}'.format(rws_num_particles))
-    axs[3].plot(wsaw_offset_history, color='0.4', linestyle='--', label='wsaw-{}'.format(rws_num_particles))
+    axs[3] = plot_with_error_bars(axs[3], iwae_offset_history, color='black', linestyle=':', label='iwae-{}'.format(iwae_num_particles))
+    axs[3] = plot_with_error_bars(axs[3], ws_offset_history, color='black', linestyle='-.', label='ws-{}'.format(rws_num_particles))
+    axs[3] = plot_with_error_bars(axs[3], ww_offset_history, color='0.8', linestyle='-', label='ww-{}'.format(rws_num_particles))
+    axs[3] = plot_with_error_bars(axs[3], wsw_offset_history, color='0.4', linestyle='-', label='wsw-{}'.format(rws_num_particles))
+    axs[3] = plot_with_error_bars(axs[3], waw_offset_history, color='0.8', linestyle='--', label='waw-{}'.format(rws_num_particles))
+    axs[3] = plot_with_error_bars(axs[3], wsaw_offset_history, color='0.4', linestyle='--', label='wsaw-{}'.format(rws_num_particles))
     axs[3].axhline(true_offset, color='black', label='true')
     axs[3].set_ylabel('$b$')
 
-    axs[4].plot(iwae_std_history, color='black', linestyle=':', label='iwae-{}'.format(iwae_num_particles))
-    axs[4].plot(ws_std_history, color='black', linestyle='-.', label='ws-{}'.format(rws_num_particles))
-    axs[4].plot(ww_std_history, color='0.8', linestyle='-', label='ww-{}'.format(rws_num_particles))
-    axs[4].plot(wsw_std_history, color='0.4', linestyle='-', label='wsw-{}'.format(rws_num_particles))
-    axs[4].plot(waw_std_history, color='0.8', linestyle='--', label='waw-{}'.format(rws_num_particles))
-    axs[4].plot(wsaw_std_history, color='0.4', linestyle='--', label='wsaw-{}'.format(rws_num_particles))
+    axs[4] = plot_with_error_bars(axs[4], iwae_std_history, color='black', linestyle=':', label='iwae-{}'.format(iwae_num_particles))
+    axs[4] = plot_with_error_bars(axs[4], ws_std_history, color='black', linestyle='-.', label='ws-{}'.format(rws_num_particles))
+    axs[4] = plot_with_error_bars(axs[4], ww_std_history, color='0.8', linestyle='-', label='ww-{}'.format(rws_num_particles))
+    axs[4] = plot_with_error_bars(axs[4], wsw_std_history, color='0.4', linestyle='-', label='wsw-{}'.format(rws_num_particles))
+    axs[4] = plot_with_error_bars(axs[4], waw_std_history, color='0.8', linestyle='--', label='waw-{}'.format(rws_num_particles))
+    axs[4] = plot_with_error_bars(axs[4], wsaw_std_history, color='0.4', linestyle='--', label='wsaw-{}'.format(rws_num_particles))
     axs[4].axhline(true_std, color='black', label='true')
     axs[4].set_ylabel('$c$')
     axs[4].set_xlabel('Iteration')
