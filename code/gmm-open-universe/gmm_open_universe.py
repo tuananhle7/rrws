@@ -427,14 +427,16 @@ class RelaxControlVariate(nn.Module):
             nn.Tanh(),
             nn.Linear(16, 16),
             nn.Tanh(),
-            nn.Linear(16, 1)
+            nn.Linear(16, 1),
+            nn.ReLU()
         )
         self.control_variate_z = nn.Sequential(
             nn.Linear(2, 16),
             nn.Tanh(),
             nn.Linear(16, 16),
             nn.Tanh(),
-            nn.Linear(16, 1)
+            nn.Linear(16, 1),
+            nn.ReLU()
         )
 
     def forward(self, aux):
