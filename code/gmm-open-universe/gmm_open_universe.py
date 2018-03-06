@@ -15,7 +15,7 @@ def generate_obs(num_samples, generative_network):
         (_, _, _, obs_20),
         (_, _, _, obs_21)
     ) = generative_network.sample(num_samples)
-    return torch.cat(list(filter(lambda x: len(x) > 0, [obs_1, obs_20, obs_21])))
+    return torch.cat(list(filter(lambda x: len(x) > 0, [obs_1, obs_20, obs_21]))).detach()
 
 
 class GenerativeNetwork(nn.Module):
