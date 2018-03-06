@@ -1,7 +1,6 @@
 from pynverse import inversefunc
 from torch.autograd import Variable
 from util import *
-import tempfile
 import uuid
 
 import numpy as np
@@ -957,7 +956,7 @@ def main():
         [vae_reinforce_elbo_history, vae_reinforce_mean_1_history],
         ['vae_reinforce_elbo_history', 'vae_reinforce_mean_1_history']
     ):
-        save_data(filename, data)
+        np.save(safe_fname(filename), data)
         print('Saved to {}'.format(filename))
 
     ## Relax
@@ -972,7 +971,7 @@ def main():
         [vae_relax_elbo_history, vae_relax_mean_1_history],
         ['vae_relax_elbo_history', 'vae_relax_mean_1_history']
     ):
-        save_data(filename, data)
+        np.save(safe_fname(filename), data)
         print('Saved to {}'.format(filename))
 
     # IWAE
@@ -990,7 +989,7 @@ def main():
             [iwae_reinforce_elbo_history, iwae_reinforce_mean_1_history],
             ['iwae_{}_reinforce_elbo_history'.format(iwae_num_particles), 'iwae_{}_reinforce_mean_1_history'.format(iwae_num_particles)]
         ):
-            save_data(filename, data)
+            np.save(safe_fname(filename), data)
             print('Saved to {}'.format(filename))
 
         ## VIMCO
@@ -1005,7 +1004,7 @@ def main():
             [iwae_vimco_elbo_history, iwae_vimco_mean_1_history],
             ['iwae_{}_vimco_elbo_history'.format(iwae_num_particles), 'iwae_{}_vimco_mean_1_history'.format(iwae_num_particles)]
         ):
-            save_data(filename, data)
+            np.save(safe_fname(filename), data)
             print('Saved to {}'.format(filename))
 
         ## Relax
@@ -1020,7 +1019,7 @@ def main():
             [iwae_relax_elbo_history, iwae_relax_mean_1_history],
             ['iwae_{}_relax_elbo_history'.format(iwae_num_particles), 'iwae_{}_relax_mean_1_history'.format(iwae_num_particles)]
         ):
-            save_data(filename, data)
+            np.save(safe_fname(filename), data)
             print('Saved to {}'.format(filename))
 
     # WS
@@ -1043,7 +1042,7 @@ def main():
         [ws1_mean_1_history, ws1_wake_theta_loss_history, ws1_sleep_phi_loss_history],
         ['ws1_mean_1_history', 'ws1_wake_theta_loss_history', 'ws1_sleep_phi_loss_history']
     ):
-        save_data(filename, data)
+        np.save(safe_fname(filename), data)
         print('Saved to {}'.format(filename))
 
     # RWS
@@ -1066,7 +1065,7 @@ def main():
         [ws_mean_1_history, ws_wake_theta_loss_history, ws_sleep_phi_loss_history],
         ['ws_mean_1_history', 'ws_wake_theta_loss_history', 'ws_sleep_phi_loss_history']
     ):
-        save_data(filename, data)
+        np.save(safe_fname(filename), data)
         print('Saved to {}'.format(filename))
 
     ## WW
@@ -1083,7 +1082,7 @@ def main():
         [ww_mean_1_history, ww_wake_theta_loss_history, ww_wake_phi_loss_history],
         ['ww_mean_1_history', 'ww_wake_theta_loss_history', 'ww_wake_phi_loss_history']
     ):
-        save_data(filename, data)
+        np.save(safe_fname(filename), data)
         print('Saved to {}'.format(filename))
 
     ## WSW
@@ -1100,7 +1099,7 @@ def main():
         [wsw_mean_1_history, wsw_wake_theta_loss_history, wsw_sleep_phi_loss_history, wsw_wake_phi_loss_history],
         ['wsw_mean_1_history', 'wsw_wake_theta_loss_history', 'wsw_sleep_phi_loss_history', 'wsw_wake_phi_loss_history']
     ):
-        save_data(filename, data)
+        np.save(safe_fname(filename), data)
         print('Saved to {}'.format(filename))
 
     ## WaW
@@ -1121,7 +1120,7 @@ def main():
         [waw_mean_1_history, waw_wake_theta_loss_history, waw_wake_phi_loss_history, waw_anneal_factor_history],
         ['waw_mean_1_history', 'waw_wake_theta_loss_history', 'waw_wake_phi_loss_history', 'waw_anneal_factor_history']
     ):
-        save_data(filename, data)
+        np.save(safe_fname(filename), data)
         print('Saved to {}'.format(filename))
 
     ## WSaW
@@ -1142,7 +1141,7 @@ def main():
         [wsaw_mean_1_history, wsaw_wake_theta_loss_history, wsaw_sleep_phi_loss_history, wsaw_wake_phi_loss_history, wsaw_anneal_factor_history],
         ['wsaw_mean_1_history', 'wsaw_wake_theta_loss_history', 'wsaw_sleep_phi_loss_history', 'wsaw_wake_phi_loss_history', 'wsaw_anneal_factor_history']
     ):
-        save_data(filename, data)
+        np.save(safe_fname(filename), data)
         print('Saved to {}'.format(filename))
 
 
@@ -1152,9 +1151,8 @@ SEED = 1
 UID = str(uuid.uuid4())[:8]
 
 
-def save_data(filename, data):
-    fname = '{}_{:d}_{}'.format(filename, SEED, UID)
-    np.save(fname, data)
+def safe_fname(fname):
+    return '{}_{:d}_{}'.format(filename, SEED, UID)
 
 
 if __name__ == '__main__':
