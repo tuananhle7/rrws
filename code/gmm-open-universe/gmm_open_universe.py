@@ -1152,7 +1152,7 @@ UID = str(uuid.uuid4())[:8]
 
 
 def safe_fname(fname):
-    return '{}_{:d}_{}'.format(filename, SEED, UID)
+    return '{}_{:d}_{}'.format(fname, SEED, UID)
 
 
 if __name__ == '__main__':
