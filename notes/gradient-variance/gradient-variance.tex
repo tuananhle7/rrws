@@ -1,0 +1,127 @@
+\documentclass[a4paper]{article}
+
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage{mathtools}
+\usepackage{palatino}
+\usepackage{amssymb}
+\usepackage{amsthm}
+\usepackage{graphicx}
+\usepackage{subcaption}
+\usepackage{booktabs}
+\usepackage{tabulary}
+\usepackage{rotating}
+\usepackage[margin=2cm]{geometry}
+\usepackage{listings}
+\usepackage[ruled,vlined]{algorithm2e}
+\usepackage{hyperref}
+\usepackage[nameinlink,capitalise]{cleveref}
+\usepackage{todonotes}
+\usepackage[round,sort&compress]{natbib}
+\usepackage[acronym,smallcaps,nowarn,section,nogroupskip,nonumberlist]{glossaries}
+
+%% Custom package setup
+% graphics
+\graphicspath{{images/}}
+% bib
+\bibliographystyle{unsrtnat}
+% abbreviations
+\glsdisablehyper{}
+\newacronym{VAE}{vae}{variational auto-encoder}
+\newacronym{KL}{kl}{Kullback-Leibler}
+\newacronym{SGD}{sgd}{stochastic gradient descent}
+\newacronym{SGA}{sga}{stochastic gradient ascent}
+\newacronym{CDAE}{cdae}{coordinate descent auto-encoder}
+\newacronym{ELBO}{elbo}{evidence lower bound}
+\newacronym{EUBO}{eubo}{evidence upper bound}
+% cleveref
+\crefname{algorithm}{Algorithm}{Algorithms}
+\crefname{equation}{Equation}{Equations}
+\crefname{figure}{Figure}{Figure}
+% todonotes
+\presetkeys{todonotes}{%
+  backgroundcolor=blue!10!white,
+  linecolor=blue!10!white,
+  bordercolor=blue!10!white
+}{}
+% misc
+\usepackage[parfill]{parskip}   % skip line instead of indent
+
+\DeclareMathOperator{\E}{{}\mathbb{E}}
+\DeclareMathOperator{\1}{{}\mathds{1}}
+\DeclareMathOperator{\DKL}{{}\mathbb{D}_{\text{\scalebox{0.75}{KL}}}}
+\DeclareMathOperator*{\argmin}{arg\,min} % * allows typesetting beneath
+\DeclareMathOperator*{\argmax}{arg\,max} % * allows typesetting beneath
+\DeclareMathOperator*{\maximize}{maximize}
+\DeclareMathOperator*{\minimize}{minimize}
+\DeclareMathOperator{\ELBO}{\acrshort{ELBO}}
+\DeclareMathOperator{\EUBO}{\acrshort{EUBO}}
+\newcommand{\given}{\lvert}
+
+\title{Why Are We Hoping Wake-Sleep is Better Than Reinforce}
+\author{}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+Consider the generative and inference networks:
+\begin{align}
+  p_\theta(z) &= \mathrm{Discrete}(z \given \theta_{1:C}) = \theta_z \\
+  p_\theta(x \given z) &= \mathrm{Normal}(x \given \mu_z, \sigma_z^2) \\
+  q_\phi(z \given x) &= \mathrm{Discrete}(z \given \phi_{1:C}) = \phi_z,
+\end{align}
+where $C$ is the number of clusters and $\mu_c, \sigma_c^2$ are fixed for $c = 1, \dotsc, C$, e.g. to $\mu_c = 10c, \sigma_c^2 = 1$.
+
+\section{Reinforce Gradient Variance}
+Let
+\begin{align}
+  \ELBO(\theta, \phi, x) := \int q_\phi(z \given x) \log \frac{p_\theta(z, x)}{q_\phi(z \given x)} \,\mathrm dz.
+\end{align}
+
+\paragraph{Gradient Estimator of $\phi$.}
+The Reinforce gradient estimator for $\nabla_\phi \ELBO(\theta, \phi, x)$ is
+\begin{align}
+  \hat G = \underbrace{\nabla_\phi \log q_\phi(z \given x) \log \frac{p_\theta(z, x)}{q_\phi(z \given x)}}_{\hat G_1} + \underbrace{\nabla_\phi \log \frac{p_\theta(z, x)}{q_\phi(z \given x)}}_{\hat G_2},
+\end{align}
+where $z \sim q_\phi(\cdot \given x)$.
+
+Let $\hat G_c$ be the $c$th element of $\hat G$. The variance of $\hat G_c$ is
+\begin{align}
+  \mathrm{Var}[\hat G_c] = \mathrm{Var}[(\hat G_1)_c] + \mathrm{Var}[(\hat G_2)_c] + \mathrm{Cov}((\hat G_1)_c, (\hat G_2)_c).
+\end{align}
+
+We can derive that
+\begin{align}
+  \mathrm{Var}[(\hat G_1)_c] &= \left(-\frac{(x - \mu_c)^2}{2 \sigma_c^2} - \frac{1}{2} \log(2 \pi \sigma_c^2) + \log \theta_c - \log \phi_c \right)^2 \left(\frac{1 - \phi_c}{\phi_c}\right)\\
+  \mathrm{Var}[(\hat G_2)_c] &= \frac{1 - \phi_c}{\phi_c}.
+\end{align}
+
+\paragraph{Gradient Estimator of $\theta$.}
+The gradient estimator for $\nabla_\theta \ELBO(\theta, \phi, x)$ is
+\begin{align}
+  \hat G_\theta = \nabla_\theta \log \frac{p_\theta(z, x)}{q_\phi(z \given x)}, \label{eq:reinforce-theta}
+\end{align}
+where $z \given q_\phi(\cdot \given x)$.
+
+The variance of the $c$th element is
+\begin{align}
+  \mathrm{Var}[(\hat G_\theta)_c] = \frac{\phi_c (1 - \phi_c)}{\theta_c^2}. \label{eq:reinforce-theta-var}
+\end{align}
+
+\section{Wake-Sleep Gradient Variance}
+\paragraph{Gradient Estimator of $\theta$.} The wake phase gradient estimator for $\theta$ is $\hat G_\theta$ in \eqref{eq:reinforce-theta} whose variance is in \eqref{eq:reinforce-theta-var}.
+
+\paragraph{Gradient Estimator of $\phi$.} The sleep phase gradient estimator for $\phi$ is
+\begin{align}
+  \hat G_\phi = \nabla_\phi \log q_\phi(z \given x),
+\end{align}
+where $z, x \sim p_\theta(z, x)$.
+
+The variance of the $c$th element is
+\begin{align}
+  \mathrm{Var}[(\hat G_\phi)_c] = \frac{\theta_c (1 - \theta_c)}{\phi_c^2}
+\end{align}
+
+\end{document}
