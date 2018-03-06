@@ -1,6 +1,8 @@
 from pynverse import inversefunc
 from torch.autograd import Variable
 from util import *
+import tempfile
+import uuid
 
 import numpy as np
 import torch
@@ -953,9 +955,9 @@ def main():
     )
     for [data, filename] in zip(
         [vae_reinforce_elbo_history, vae_reinforce_mean_1_history],
-        ['vae_reinforce_elbo_history.npy', 'vae_reinforce_mean_1_history.npy']
+        ['vae_reinforce_elbo_history', 'vae_reinforce_mean_1_history']
     ):
-        np.save(filename, data)
+        save_data(filename, data)
         print('Saved to {}'.format(filename))
 
     ## Relax
@@ -968,9 +970,9 @@ def main():
     )
     for [data, filename] in zip(
         [vae_relax_elbo_history, vae_relax_mean_1_history],
-        ['vae_relax_elbo_history.npy', 'vae_relax_mean_1_history.npy']
+        ['vae_relax_elbo_history', 'vae_relax_mean_1_history']
     ):
-        np.save(filename, data)
+        save_data(filename, data)
         print('Saved to {}'.format(filename))
 
     # IWAE
@@ -986,9 +988,9 @@ def main():
         )
         for [data, filename] in zip(
             [iwae_reinforce_elbo_history, iwae_reinforce_mean_1_history],
-            ['iwae_{}_reinforce_elbo_history.npy'.format(iwae_num_particles), 'iwae_{}_reinforce_mean_1_history.npy'.format(iwae_num_particles)]
+            ['iwae_{}_reinforce_elbo_history'.format(iwae_num_particles), 'iwae_{}_reinforce_mean_1_history'.format(iwae_num_particles)]
         ):
-            np.save(filename, data)
+            save_data(filename, data)
             print('Saved to {}'.format(filename))
 
         ## VIMCO
@@ -1001,9 +1003,9 @@ def main():
         )
         for [data, filename] in zip(
             [iwae_vimco_elbo_history, iwae_vimco_mean_1_history],
-            ['iwae_{}_vimco_elbo_history.npy'.format(iwae_num_particles), 'iwae_{}_vimco_mean_1_history.npy'.format(iwae_num_particles)]
+            ['iwae_{}_vimco_elbo_history'.format(iwae_num_particles), 'iwae_{}_vimco_mean_1_history'.format(iwae_num_particles)]
         ):
-            np.save(filename, data)
+            save_data(filename, data)
             print('Saved to {}'.format(filename))
 
         ## Relax
@@ -1016,9 +1018,9 @@ def main():
         )
         for [data, filename] in zip(
             [iwae_relax_elbo_history, iwae_relax_mean_1_history],
-            ['iwae_{}_relax_elbo_history.npy'.format(iwae_num_particles), 'iwae_{}_relax_mean_1_history.npy'.format(iwae_num_particles)]
+            ['iwae_{}_relax_elbo_history'.format(iwae_num_particles), 'iwae_{}_relax_mean_1_history'.format(iwae_num_particles)]
         ):
-            np.save(filename, data)
+            save_data(filename, data)
             print('Saved to {}'.format(filename))
 
     # WS
@@ -1039,9 +1041,9 @@ def main():
     )
     for [data, filename] in zip(
         [ws1_mean_1_history, ws1_wake_theta_loss_history, ws1_sleep_phi_loss_history],
-        ['ws1_mean_1_history.npy', 'ws1_wake_theta_loss_history.npy', 'ws1_sleep_phi_loss_history.npy']
+        ['ws1_mean_1_history', 'ws1_wake_theta_loss_history', 'ws1_sleep_phi_loss_history']
     ):
-        np.save(filename, data)
+        save_data(filename, data)
         print('Saved to {}'.format(filename))
 
     # RWS
@@ -1062,9 +1064,9 @@ def main():
     )
     for [data, filename] in zip(
         [ws_mean_1_history, ws_wake_theta_loss_history, ws_sleep_phi_loss_history],
-        ['ws_mean_1_history.npy', 'ws_wake_theta_loss_history.npy', 'ws_sleep_phi_loss_history.npy']
+        ['ws_mean_1_history', 'ws_wake_theta_loss_history', 'ws_sleep_phi_loss_history']
     ):
-        np.save(filename, data)
+        save_data(filename, data)
         print('Saved to {}'.format(filename))
 
     ## WW
@@ -1079,9 +1081,9 @@ def main():
     )
     for [data, filename] in zip(
         [ww_mean_1_history, ww_wake_theta_loss_history, ww_wake_phi_loss_history],
-        ['ww_mean_1_history.npy', 'ww_wake_theta_loss_history.npy', 'ww_wake_phi_loss_history.npy']
+        ['ww_mean_1_history', 'ww_wake_theta_loss_history', 'ww_wake_phi_loss_history']
     ):
-        np.save(filename, data)
+        save_data(filename, data)
         print('Saved to {}'.format(filename))
 
     ## WSW
@@ -1096,9 +1098,9 @@ def main():
     )
     for [data, filename] in zip(
         [wsw_mean_1_history, wsw_wake_theta_loss_history, wsw_sleep_phi_loss_history, wsw_wake_phi_loss_history],
-        ['wsw_mean_1_history.npy', 'wsw_wake_theta_loss_history.npy', 'wsw_sleep_phi_loss_history.npy', 'wsw_wake_phi_loss_history.npy']
+        ['wsw_mean_1_history', 'wsw_wake_theta_loss_history', 'wsw_sleep_phi_loss_history', 'wsw_wake_phi_loss_history']
     ):
-        np.save(filename, data)
+        save_data(filename, data)
         print('Saved to {}'.format(filename))
 
     ## WaW
@@ -1117,9 +1119,9 @@ def main():
     )
     for [data, filename] in zip(
         [waw_mean_1_history, waw_wake_theta_loss_history, waw_wake_phi_loss_history, waw_anneal_factor_history],
-        ['waw_mean_1_history.npy', 'waw_wake_theta_loss_history.npy', 'waw_wake_phi_loss_history.npy', 'waw_anneal_factor_history.npy']
+        ['waw_mean_1_history', 'waw_wake_theta_loss_history', 'waw_wake_phi_loss_history', 'waw_anneal_factor_history']
     ):
-        np.save(filename, data)
+        save_data(filename, data)
         print('Saved to {}'.format(filename))
 
     ## WSaW
@@ -1138,14 +1140,21 @@ def main():
     )
     for [data, filename] in zip(
         [wsaw_mean_1_history, wsaw_wake_theta_loss_history, wsaw_sleep_phi_loss_history, wsaw_wake_phi_loss_history, wsaw_anneal_factor_history],
-        ['wsaw_mean_1_history.npy', 'wsaw_wake_theta_loss_history.npy', 'wsaw_sleep_phi_loss_history.npy', 'wsaw_wake_phi_loss_history.npy', 'wsaw_anneal_factor_history.npy']
+        ['wsaw_mean_1_history', 'wsaw_wake_theta_loss_history', 'wsaw_sleep_phi_loss_history', 'wsaw_wake_phi_loss_history', 'wsaw_anneal_factor_history']
     ):
-        np.save(filename, data)
+        save_data(filename, data)
         print('Saved to {}'.format(filename))
 
 
 # globals
 CUDA = False
+SEED = 1
+UID = str(uuid.uuid4())[:8]
+
+
+def save_data(filename, data):
+    fname = '{}_{:d}_{}'.format(filename, SEED, UID)
+    np.save(fname, data)
 
 
 if __name__ == '__main__':
@@ -1160,10 +1169,13 @@ if __name__ == '__main__':
     args = parser.parse_args()
     args.cuda = args.cuda and torch.cuda.is_available()
     CUDA = args.cuda
+    SEED = args.seed
 
     torch.manual_seed(args.seed)
     if args.cuda:
         torch.cuda.manual_seed(args.seed)
 
     print('CUDA:', CUDA)
+    print('SEED:', SEED)
+    print('UID:', UID)
     main()
