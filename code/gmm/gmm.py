@@ -1,5 +1,6 @@
 from torch.autograd import Variable
 
+import uuid
 import numpy as np
 import torch
 import torch.nn as nn
@@ -19,7 +20,7 @@ class OnlineMeanStd():
             self.M2s = []
             for new_var in new_variables:
                 self.means.append(new_var.data)
-                self.M2s.append(torch.zeros(new_var.size()))
+                self.M2s.append(new_var.data.new(new_var.size()).fill_(0))
         else:
             self.count = self.count + 1
             for new_var_idx, new_var in enumerate(new_variables):
@@ -114,7 +115,7 @@ class GenerativeNetwork(nn.Module):
         return F.softmax(self.mixture_probs_pre_softmax, dim=0)
 
     def get_x_params(self):
-        return self.mean_multiplier * Variable(torch.arange(self.num_mixtures)), torch.exp(self.log_stds)
+        return self.mean_multiplier * Variable(torch.arange(self.num_mixtures).type_as(self.mixture_probs_pre_softmax.data)), torch.exp(self.log_stds)
 
     def sample_z(self, num_samples):
         return torch.multinomial(
@@ -125,7 +126,7 @@ class GenerativeNetwork(nn.Module):
     def sample_x(self, z):
         num_samples = len(z)
         means, stds = self.get_x_params()
-        return means[z] + stds[z] * Variable(torch.Tensor(num_samples).normal_())
+        return means[z] + stds[z] * Variable(means.data.new(num_samples).normal_())
 
     def sample(self, num_samples):
         z = self.sample_z(num_samples)
@@ -290,9 +291,13 @@ def train_iwae(
     p_grad_std_history = []
     q_grad_std_history = []
 
+    reset_seed()
     iwae = IWAE(p_init_mixture_probs_pre_softmax, init_mean_multiplier, init_log_stds)
     optimizer = torch.optim.Adam(iwae.parameters(), lr=learning_rate)
     true_generative_network = GenerativeNetwork(np.log(true_p_mixture_probs), true_mean_multiplier, true_log_stds)
+    if CUDA:
+        iwae.cuda()
+        true_generative_network.cuda()
 
     for i in range(num_iterations):
         x = generate_obs(num_samples, true_generative_network)
@@ -306,7 +311,7 @@ def train_iwae(
         if i % logging_interval == 0:
             elbo_history.append(elbo.data[0])
             log_evidence_history.append(torch.mean(iwae.generative_network.log_evidence(test_x)).data[0])
-            p_mixture_probs = iwae.generative_network.get_z_params().data.numpy()
+            p_mixture_probs = iwae.generative_network.get_z_params().data.cpu().numpy()
             p_mixture_probs_ess_history.append(1 / np.sum(p_mixture_probs**2))
             p_mixture_probs_norm_history.append(np.linalg.norm(p_mixture_probs - true_p_mixture_probs))
             mean_multiplier_history.append(iwae.generative_network.mean_multiplier.data[0])
@@ -386,11 +391,15 @@ def train_rws(
     p_grad_std_history = []
     q_grad_std_history = []
 
+    reset_seed()
     rws = RWS(p_init_mixture_probs_pre_softmax, init_mean_multiplier, init_log_stds)
     theta_optimizer = torch.optim.Adam(rws.generative_network.parameters(), lr=learning_rate)
     phi_optimizer = torch.optim.Adam(rws.inference_network.parameters(), lr=learning_rate)
 
     true_generative_network = GenerativeNetwork(np.log(true_p_mixture_probs), true_mean_multiplier, true_log_stds)
+    if CUDA:
+        rws.cuda()
+        true_generative_network.cuda()
 
     for i in range(num_iterations):
         x = generate_obs(num_samples, true_generative_network)
@@ -422,7 +431,7 @@ def train_rws(
 
         if i % logging_interval == 0:
             log_evidence_history.append(torch.mean(rws.generative_network.log_evidence(test_x)).data[0])
-            p_mixture_probs = rws.generative_network.get_z_params().data.numpy()
+            p_mixture_probs = rws.generative_network.get_z_params().data.cpu().numpy()
             p_mixture_probs_ess_history.append(1 / np.sum(p_mixture_probs**2))
             p_mixture_probs_norm_history.append(np.linalg.norm(p_mixture_probs - true_p_mixture_probs))
             mean_multiplier_history.append(rws.generative_network.mean_multiplier.data[0])
@@ -489,18 +498,20 @@ def main():
     num_samples = 100
 
     true_generative_network = GenerativeNetwork(np.log(true_p_mixture_probs), true_mean_multiplier, true_log_stds)
+    if CUDA:
+        true_generative_network.cuda()
     test_x = generate_obs(num_test_samples, true_generative_network)
     true_log_evidence = torch.mean(true_generative_network.log_evidence(test_x)).data[0]
 
     print('true_log_evidence = {}'.format(true_log_evidence))
     filename = 'true_log_evidence.npy'
-    np.save(filename, true_log_evidence)
+    np.save(safe_fname(filename), true_log_evidence)
     print('Saved to {}'.format(filename))
 
     true_ess = 1 / np.sum(true_p_mixture_probs**2)
     print('true_ess = {}'.format(true_ess))
     filename = 'true_ess.npy'
-    np.save(filename, true_ess)
+    np.save(safe_fname(filename), true_ess)
     print('Saved to {}'.format(filename))
 
     learning_rate = 1e-3
@@ -508,15 +519,15 @@ def main():
     logging_interval = 1000
 
     filename = 'num_mixtures.npy'
-    np.save(filename, num_mixtures)
+    np.save(safe_fname(filename), num_mixtures)
     print('Saved to {}'.format(filename))
 
     filename = 'logging_interval.npy'
-    np.save(filename, logging_interval)
+    np.save(safe_fname(filename), logging_interval)
     print('Saved to {}'.format(filename))
 
     filename = 'num_iterations.npy'
-    np.save(filename, num_iterations)
+    np.save(safe_fname(filename), num_iterations)
     print('Saved to {}'.format(filename))
 
     # IWAE
@@ -534,7 +545,7 @@ def main():
         [iwae_reinforce_log_evidence_history, iwae_reinforce_elbo_history, iwae_reinforce_p_mixture_probs_ess_history, iwae_reinforce_p_mixture_probs_norm_history, iwae_reinforce_mean_multiplier_history, iwae_reinforce_p_grad_std_history, iwae_reinforce_q_grad_std_history],
         ['iwae_reinforce_log_evidence_history.npy', 'iwae_reinforce_elbo_history.npy', 'iwae_reinforce_p_mixture_probs_ess_history.npy', 'iwae_reinforce_p_mixture_probs_norm_history.npy', 'iwae_reinforce_mean_multiplier_history.npy', 'iwae_reinforce_p_grad_std_history.npy', 'iwae_reinforce_q_grad_std_history.npy']
     ):
-        np.save(filename, data)
+        np.save(safe_fname(filename), data)
         print('Saved to {}'.format(filename))
 
     ## VIMCO
@@ -550,7 +561,7 @@ def main():
         [iwae_vimco_log_evidence_history, iwae_vimco_elbo_history, iwae_vimco_p_mixture_probs_ess_history, iwae_vimco_p_mixture_probs_norm_history, iwae_vimco_mean_multiplier_history, iwae_vimco_p_grad_std_history, iwae_vimco_q_grad_std_history],
         ['iwae_vimco_log_evidence_history.npy', 'iwae_vimco_elbo_history.npy', 'iwae_vimco_p_mixture_probs_ess_history.npy', 'iwae_vimco_p_mixture_probs_norm_history.npy', 'iwae_vimco_mean_multiplier_history.npy', 'iwae_vimco_p_grad_std_history.npy', 'iwae_vimco_q_grad_std_history.npy']
     ):
-        np.save(filename, data)
+        np.save(safe_fname(filename), data)
         print('Saved to {}'.format(filename))
 
     ## Relax
@@ -570,7 +581,7 @@ def main():
         [ws_log_evidence_history, ws_p_mixture_probs_ess_history, ws_p_mixture_probs_norm_history, ws_mean_multiplier_history, ws_p_grad_std_history, ws_q_grad_std_history],
         ['ws_log_evidence_history.npy', 'ws_p_mixture_probs_ess_history.npy', 'ws_p_mixture_probs_norm_history.npy', 'ws_mean_multiplier_history.npy', 'ws_p_grad_std_history.npy', 'ws_q_grad_std_history.npy']
     ):
-        np.save(filename, data)
+        np.save(safe_fname(filename), data)
         print('Saved to {}'.format(filename))
 
     ## WW
@@ -586,7 +597,7 @@ def main():
         [ww_log_evidence_history, ww_p_mixture_probs_ess_history, ww_p_mixture_probs_norm_history, ww_mean_multiplier_history, ww_p_grad_std_history, ww_q_grad_std_history],
         ['ww_log_evidence_history.npy', 'ww_p_mixture_probs_ess_history.npy', 'ww_p_mixture_probs_norm_history.npy', 'ww_mean_multiplier_history.npy', 'ww_p_grad_std_history.npy', 'ww_q_grad_std_history.npy']
     ):
-        np.save(filename, data)
+        np.save(safe_fname(filename), data)
         print('Saved to {}'.format(filename))
 
     ## WSW
@@ -602,9 +613,44 @@ def main():
         [wsw_log_evidence_history, wsw_p_mixture_probs_ess_history, wsw_p_mixture_probs_norm_history, wsw_mean_multiplier_history, wsw_p_grad_std_history, wsw_q_grad_std_history],
         ['wsw_log_evidence_history.npy', 'wsw_p_mixture_probs_ess_history.npy', 'wsw_p_mixture_probs_norm_history.npy', 'wsw_mean_multiplier_history.npy', 'wsw_p_grad_std_history.npy', 'wsw_q_grad_std_history.npy']
     ):
-        np.save(filename, data)
+        np.save(safe_fname(filename), data)
         print('Saved to {}'.format(filename))
 
 
+# globals
+CUDA = False
+SEED = 1
+UID = str(uuid.uuid4())[:8]
+
+
+def safe_fname(fname):
+    return '{}_{:d}_{}'.format(fname, SEED, UID)
+
+
+def reset_seed():
+    np.random.seed(SEED)
+    torch.manual_seed(SEED)
+    if CUDA:
+        torch.cuda.manual_seed(SEED)
+
+
 if __name__ == '__main__':
+    torch.backends.cudnn.benchmark = True
+    import argparse
+
+    parser = argparse.ArgumentParser(description='GMM open universe')
+    parser.add_argument('--cuda', action='store_true', default=False,
+                        help='enables CUDA use')
+    parser.add_argument('--seed', type=int, default=1, metavar='S',
+                        help='random seed (default: 1)')
+    args = parser.parse_args()
+    args.cuda = args.cuda and torch.cuda.is_available()
+    CUDA = args.cuda
+    SEED = args.seed
+
+    reset_seed()
+
+    print('CUDA:', CUDA)
+    print('SEED:', SEED)
+    print('UID:', UID)
     main()
