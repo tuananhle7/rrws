@@ -694,6 +694,7 @@ def train_iwae(
     true_mean_1,
     num_iterations, num_samples, num_particles, gradient_estimator, learning_rate
 ):
+    reset_seed()
     mean_1_history = np.zeros([num_iterations])
     elbo_history = np.zeros([num_iterations])
     iwae = IWAE(num_clusters_probs, init_mean_1, std_1, mixture_probs, means_2, stds_2, obs_std)
@@ -841,12 +842,13 @@ def train_rws(
     true_mean_1,
     sleep_phi, wake_phi, num_samples, num_particles,
     theta_learning_rate, phi_learning_rate,
-    num_iterations, anneal_wake_phi=False, init_anneal_factor=None, ess_threshold=None, sleep_num_samples=None
+    num_iterations, anneal_wake_phi=False, init_anneal_factor=None, ess_threshold=None, sleep_num_samples=None, anneal_wake_phi_sleep=False
 ):
     if (not sleep_phi) and (not wake_phi):
         raise AttributeError('Must have at least one of sleep_phi or wake_phi phases')
     if (not wake_phi) and anneal_wake_phi:
         raise AttributeError('Must have wake-phi phase in order to be able to anneal it')
+    reset_seed()
 
     mean_1_history = np.zeros([num_iterations])
 
@@ -885,8 +887,28 @@ def train_rws(
         theta_optimizer.step()
         wake_theta_loss_history[i] = loss.data[0]
 
+        # anneal across phi updates
+        if sleep_phi and wake_phi:
+            phi_optimizer.zero_grad()
+            s_loss = rws('sleep_phi', num_samples=sleep_num_samples)
+            w_loss = rws('wake_phi', obs=obs, num_particles=num_particles)
+            if anneal_wake_phi_sleep:
+                d = (s_loss - w_loss).abs()
+                alpha = 1 - d.neg().exp().data[0]
+                if i % 100 == 0:
+                    print('d:{:.4f}\t alpha:{:.4f}'.format(d.data[0], alpha))
+            else:
+                alpha = 0.5
+            loss = alpha * w_loss + (1 - alpha) * s_loss
+            loss.backward()
+            phi_optimizer.step()
+            sleep_phi_loss_history[i] = s_loss.data[0]
+            wake_phi_loss_history[i] = w_loss.data[0]
+            if anneal_wake_phi:
+                anneal_factor_history[i] = rws.anneal_factor
+
         # Sleep phi
-        if sleep_phi:
+        if sleep_phi and not wake_phi:
             phi_optimizer.zero_grad()
             loss = rws('sleep_phi', num_samples=sleep_num_samples)
             loss.backward()
@@ -894,7 +916,7 @@ def train_rws(
             sleep_phi_loss_history[i] = loss.data[0]
 
         # Wake phi
-        if wake_phi:
+        if wake_phi and not sleep_phi:
             phi_optimizer.zero_grad()
             loss = rws('wake_phi', obs=obs, num_particles=num_particles)
             loss.backward()
@@ -1104,6 +1126,24 @@ def main():
         np.save(safe_fname(filename), data)
         print('Saved to {}'.format(filename))
 
+    ## WSWa -- anneals between wake-phase-phi and sleep-phase-phi
+    sleep_phi = True
+    wake_phi = True
+    wswa_mean_1_history, wswa_wake_theta_loss_history, wswa_sleep_phi_loss_history, wswa_wake_phi_loss_history, _ = train_rws(
+        num_clusters_probs, init_mean_1, std_1, mixture_probs, means_2, stds_2, obs_std,
+        true_mean_1,
+        sleep_phi, wake_phi, rws_num_samples, rws_num_particles,
+        theta_learning_rate, phi_learning_rate,
+        num_iterations, sleep_num_samples=rws_sleep_num_samples,
+        anneal_wake_phi_sleep=True
+    )
+    for [data, filename] in zip(
+        [wswa_mean_1_history, wswa_wake_theta_loss_history, wswa_sleep_phi_loss_history, wswa_wake_phi_loss_history],
+        ['wswa_mean_1_history', 'wswa_wake_theta_loss_history', 'wswa_sleep_phi_loss_history', 'wswa_wake_phi_loss_history']
+    ):
+        np.save(safe_fname(filename), data)
+        print('Saved to {}'.format(filename))
+
     ## WaW
     sleep_phi = False
     wake_phi = True
@@ -1157,6 +1197,13 @@ def safe_fname(fname):
     return '{}_{:d}_{}'.format(fname, SEED, UID)
 
 
+def reset_seed():
+    np.random.seed(SEED)
+    torch.manual_seed(SEED)
+    if CUDA:
+        torch.cuda.manual_seed(SEED)
+
+
 if __name__ == '__main__':
     torch.backends.cudnn.benchmark = True
     import argparse
@@ -1171,9 +1218,7 @@ if __name__ == '__main__':
     CUDA = args.cuda
     SEED = args.seed
 
-    torch.manual_seed(args.seed)
-    if args.cuda:
-        torch.cuda.manual_seed(args.seed)
+    reset_seed()
 
     print('CUDA:', CUDA)
     print('SEED:', SEED)
