@@ -694,6 +694,7 @@ def train_iwae(
     true_mean_1,
     num_iterations, num_samples, num_particles, gradient_estimator, learning_rate
 ):
+    reset_seed()
     mean_1_history = np.zeros([num_iterations])
     elbo_history = np.zeros([num_iterations])
     iwae = IWAE(num_clusters_probs, init_mean_1, std_1, mixture_probs, means_2, stds_2, obs_std)
@@ -847,6 +848,7 @@ def train_rws(
         raise AttributeError('Must have at least one of sleep_phi or wake_phi phases')
     if (not wake_phi) and anneal_wake_phi:
         raise AttributeError('Must have wake-phi phase in order to be able to anneal it')
+    reset_seed()
 
     mean_1_history = np.zeros([num_iterations])
 
@@ -1157,6 +1159,13 @@ def safe_fname(fname):
     return '{}_{:d}_{}'.format(fname, SEED, UID)
 
 
+def reset_seed():
+    np.random.seed(SEED)
+    torch.manual_seed(SEED)
+    if CUDA:
+        torch.cuda.manual_seed(SEED)
+
+
 if __name__ == '__main__':
     torch.backends.cudnn.benchmark = True
     import argparse
@@ -1171,9 +1180,7 @@ if __name__ == '__main__':
     CUDA = args.cuda
     SEED = args.seed
 
-    torch.manual_seed(args.seed)
-    if args.cuda:
-        torch.cuda.manual_seed(args.seed)
+    reset_seed()
 
     print('CUDA:', CUDA)
     print('SEED:', SEED)
