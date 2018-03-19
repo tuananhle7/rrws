@@ -606,7 +606,7 @@ def main(args):
 
     num_iterations = 30000
     logging_interval = 1000
-    saving_interval = 10000
+    saving_interval = 1000
 
     filename = 'num_mixtures'
     np.save(safe_fname(filename, 'npy'), num_mixtures)
