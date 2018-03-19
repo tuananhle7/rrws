@@ -464,7 +464,7 @@ def train_rws(
             raise AttributeError('Mode must be one of ws, ww, wsw. Got: {}'.format(mode))
 
         if i % saving_interval == 0:
-            filename = safe_fname('{}_{}'.format(gradient_estimator, i), 'pt')
+            filename = safe_fname('{}_{}'.format(mode, i), 'pt')
             torch.save(
                 OrderedDict((name, tensor.cpu()) for name, tensor in rws.state_dict().items()),
                 filename
