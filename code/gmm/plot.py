@@ -149,9 +149,9 @@ def main(args):
     axs[3].set_ylim(0)
     axs[3].set_ylabel('L2 of mixture probs.\n to true mixture probs.')
 
-    axs[4].set_ylabel('L2 of q to current p')
+    axs[4].set_ylabel('Avg. test L2 of\nq to current p')
 
-    axs[5].set_ylabel('L2 of q to true p')
+    axs[5].set_ylabel('Avg. test L2 of\nq to true p')
 
     axs[-1].legend(ncol=4, loc='upper center', bbox_to_anchor=(0.5, -0.4))
     axs[-1].set_xlabel('Iteration')
