@@ -22,7 +22,6 @@ def main(args):
     num_mixtures = np_load('num_mixtures.npy')
     num_iterations = np_load('num_iterations.npy')
     logging_interval = np_load('logging_interval.npy')
-    true_ess = np_load('true_ess.npy')
     logging_iterations = np.arange(0, num_iterations, logging_interval)
 
     # Plotting
