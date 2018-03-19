@@ -9,9 +9,11 @@ import torch.nn.functional as F
 
 iwae_optim = torch.optim.Adam
 iwae_optim_params = {'lr': 1e-3}
-rws_optim = torch.optim.SGD  # SGD
+rws_theta_optim = torch.optim.Adam  # SGD
+rws_phi_optim = torch.optim.SGD
 # rws_optim_params = {'lr': 1e-3, 'nesterov': True, 'momentum': 0.7}
-rws_optim_params = {'lr': 1e-3}
+rws_theta_optim_params = {'lr': 1e-3}
+rws_phi_optim_params = {'lr': 1e-1}
 
 
 class OnlineMeanStd():
@@ -443,8 +445,8 @@ def train_rws(
 
     reset_seed()
     rws = RWS(p_init_mixture_probs_pre_softmax, init_mean_multiplier, init_log_stds)
-    theta_optimizer = rws_optim(rws.generative_network.parameters(), **rws_optim_params)
-    phi_optimizer = rws_optim(rws.inference_network.parameters(), **rws_optim_params)
+    theta_optimizer = rws_theta_optim(rws.generative_network.parameters(), **rws_theta_optim_params)
+    phi_optimizer = rws_phi_optim(rws.inference_network.parameters(), **rws_phi_optim_params)
 
     true_generative_network = GenerativeNetwork(np.log(true_p_mixture_probs), true_mean_multiplier, true_log_stds)
     if CUDA:
