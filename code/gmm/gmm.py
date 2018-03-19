@@ -13,7 +13,7 @@ rws_theta_optim = torch.optim.Adam  # SGD
 rws_phi_optim = torch.optim.SGD
 # rws_optim_params = {'lr': 1e-3, 'nesterov': True, 'momentum': 0.7}
 rws_theta_optim_params = {'lr': 1e-3}
-rws_phi_optim_params = {'lr': 1e-1}
+rws_phi_optim_params = {'lr': 1}
 
 
 class OnlineMeanStd():
@@ -325,6 +325,7 @@ def train_iwae(
     mean_multiplier_history = []
     p_grad_std_history = []
     q_grad_std_history = []
+    q_grad_mean_history = []
 
     reset_seed()
     iwae = IWAE(p_init_mixture_probs_pre_softmax, init_mean_multiplier, init_log_stds)
@@ -374,14 +375,17 @@ def train_iwae(
                 p_online_mean_std.update([p.grad for p in iwae.generative_network.parameters()])
                 q_online_mean_std.update([p.grad for p in iwae.inference_network.parameters()])
             p_grad_std_history.append(p_online_mean_std.avg_of_means_stds()[1])
-            q_grad_std_history.append(q_online_mean_std.avg_of_means_stds()[1])
+
+            q_grad_stats = q_online_mean_std.avg_of_means_stds()
+            q_grad_std_history.append(q_grad_stats[1])
+            q_grad_mean_history.append(q_grad_stats[0])
 
             print('Iteration {}: elbo = {}, log_evidence = {}, norm = {}'.format(
                 i, elbo_history[-1], log_evidence_history[-1], p_mixture_probs_norm_history[-1]
             ))
 
     return tuple(map(np.array, [
-        log_evidence_history, elbo_history, posterior_norm_history, true_posterior_norm_history, p_mixture_probs_norm_history, mean_multiplier_history, p_grad_std_history, q_grad_std_history
+        log_evidence_history, elbo_history, posterior_norm_history, true_posterior_norm_history, p_mixture_probs_norm_history, mean_multiplier_history, p_grad_std_history, q_grad_std_history, q_grad_mean_history
     ]))
 
 
@@ -442,6 +446,7 @@ def train_rws(
     mean_multiplier_history = []
     p_grad_std_history = []
     q_grad_std_history = []
+    q_grad_mean_history = []
 
     reset_seed()
     rws = RWS(p_init_mixture_probs_pre_softmax, init_mean_multiplier, init_log_stds)
@@ -527,7 +532,6 @@ def train_rws(
                     loss = rws('sleep_phi', num_samples=num_particles)
                     loss.backward()
                     q_online_mean_std.update([p.grad for p in rws.inference_network.parameters()])
-                q_grad_std_history.append(q_online_mean_std.avg_of_means_stds()[1])
             elif mode == 'ww':
                 q_online_mean_std = OnlineMeanStd()
                 for mc_sample_idx in range(num_mc_samples):
@@ -535,7 +539,6 @@ def train_rws(
                     loss = rws('wake_phi', x=test_x, num_particles=num_particles)
                     loss.backward()
                     q_online_mean_std.update([p.grad for p in rws.inference_network.parameters()])
-                q_grad_std_history.append(q_online_mean_std.avg_of_means_stds()[1])
             elif mode == 'wsw':
                 q_online_mean_std = OnlineMeanStd()
                 for mc_sample_idx in range(num_mc_samples):
@@ -543,7 +546,6 @@ def train_rws(
                     loss = 0.5 * rws('sleep_phi', num_samples=num_particles) + 0.5 * rws('wake_phi', x=test_x, num_particles=num_particles)
                     loss.backward()
                     q_online_mean_std.update([p.grad for p in rws.inference_network.parameters()])
-                q_grad_std_history.append(q_online_mean_std.avg_of_means_stds()[1])
             elif mode == 'wswa':
                 q_online_mean_std = OnlineMeanStd()
                 for mc_sample_idx in range(num_mc_samples):
@@ -555,16 +557,19 @@ def train_rws(
                     loss = alpha * w_loss + (1 - alpha) * s_loss
                     loss.backward()
                     q_online_mean_std.update([p.grad for p in rws.inference_network.parameters()])
-                q_grad_std_history.append(q_online_mean_std.avg_of_means_stds()[1])
             else:
                 raise AttributeError('Mode must be one of ws, ww, wsw. Got: {}'.format(mode))
+
+            q_grad_stats = q_online_mean_std.avg_of_means_stds()
+            q_grad_std_history.append(q_grad_stats[1])
+            q_grad_mean_history.append(q_grad_stats[0])
 
             print('Iteration {}: log_evidence = {}, norm = {}'.format(
                 i, log_evidence_history[-1], p_mixture_probs_norm_history[-1]
             ))
 
     return tuple(map(np.array, [
-        log_evidence_history, posterior_norm_history, true_posterior_norm_history, p_mixture_probs_norm_history, mean_multiplier_history, p_grad_std_history, q_grad_std_history
+        log_evidence_history, posterior_norm_history, true_posterior_norm_history, p_mixture_probs_norm_history, mean_multiplier_history, p_grad_std_history, q_grad_std_history, q_grad_mean_history
     ]))
 
 
@@ -617,7 +622,7 @@ def main(args):
 
     # IWAE
 
-    iwae_filenames = ['log_evidence_history', 'elbo_history', 'posterior_norm_history', 'true_posterior_norm_history', 'p_mixture_probs_norm_history', 'mean_multiplier_history', 'p_grad_std_history', 'q_grad_std_history']
+    iwae_filenames = ['log_evidence_history', 'elbo_history', 'posterior_norm_history', 'true_posterior_norm_history', 'p_mixture_probs_norm_history', 'mean_multiplier_history', 'p_grad_std_history', 'q_grad_std_history', 'q_grad_mean_history']
 
     ## Reinforce
     if args.all or args.reinforce:
@@ -656,7 +661,7 @@ def main(args):
     ## Relax
 
     # RWS
-    rws_filenames = ['log_evidence_history', 'posterior_norm_history', 'true_posterior_norm_history', 'p_mixture_probs_norm_history', 'mean_multiplier_history', 'p_grad_std_history', 'q_grad_std_history']
+    rws_filenames = ['log_evidence_history', 'posterior_norm_history', 'true_posterior_norm_history', 'p_mixture_probs_norm_history', 'mean_multiplier_history', 'p_grad_std_history', 'q_grad_std_history', 'q_grad_mean_history']
 
     ## WS
     if args.all or args.ws:
