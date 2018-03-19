@@ -7,6 +7,7 @@ SMALL_SIZE = 7
 MEDIUM_SIZE = 9
 BIGGER_SIZE = 11
 
+plt.switch_backend('agg')
 plt.rc('font', size=SMALL_SIZE)          # controls default text sizes
 plt.rc('axes', titlesize=SMALL_SIZE)     # fontsize of the axes title
 plt.rc('axes', labelsize=SMALL_SIZE)    # fontsize of the x and y labels
