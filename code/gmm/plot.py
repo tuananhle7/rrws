@@ -26,60 +26,114 @@ def main(args):
     logging_iterations = np.arange(0, num_iterations, logging_interval)
 
     # Plotting
-    fig, axs = plt.subplots(4, 1, sharex=True)
-    fig.set_size_inches(3.25, 5)
+    fig, axs = plt.subplots(6, 1, sharex=True)
+    fig.set_size_inches(3.25, 8)
 
     for ax in axs:
         ax.spines['top'].set_visible(False)
         ax.spines['right'].set_visible(False)
 
-    if args.all or args.reinforce:
-        iwae_reinforce_log_evidence_history, iwae_reinforce_elbo_history, iwae_reinforce_p_mixture_probs_ess_history, iwae_reinforce_p_mixture_probs_norm_history, iwae_reinforce_mean_multiplier_history, iwae_reinforce_p_grad_std_history, iwae_reinforce_q_grad_std_history = np_load('iwae_reinforce_log_evidence_history'), np_load('iwae_reinforce_elbo_history'), np_load('iwae_reinforce_p_mixture_probs_ess_history'), np_load('iwae_reinforce_p_mixture_probs_norm_history'), np_load('iwae_reinforce_mean_multiplier_history'), np_load('iwae_reinforce_p_grad_std_history'), np_load('iwae_reinforce_q_grad_std_history')
+    ## IWAE
+    iwae_filenames = ['log_evidence_history', 'elbo_history', 'posterior_norm_history', 'true_posterior_norm_history', 'p_mixture_probs_norm_history', 'mean_multiplier_history', 'p_grad_std_history', 'q_grad_std_history']
 
-        axs[0].plot(logging_iterations, iwae_reinforce_log_evidence_history, linestyle=':', color='0.5', label='reinforce')
-        axs[1].plot(logging_iterations, iwae_reinforce_p_grad_std_history, linestyle=':', color='0.5', label='reinforce')
-        axs[2].plot(logging_iterations, iwae_reinforce_q_grad_std_history, linestyle=':', color='0.5', label='reinforce')
-        axs[3].plot(logging_iterations, iwae_reinforce_p_mixture_probs_norm_history, linestyle=':', color='0.5', label='reinforce')
+    if args.all or args.reinforce:
+        iwae_reinforce = dict(zip(
+            iwae_filenames,
+            map(
+                lambda iwae_filename: np_load('iwae_reinforce_{}'.format(iwae_filename)),
+                iwae_filenames
+            )
+        ))
+
+        axs[0].plot(logging_iterations, iwae_reinforce['log_evidence_history'], linestyle=':', color='0.5', label='reinforce')
+        axs[1].plot(logging_iterations, iwae_reinforce['p_grad_std_history'], linestyle=':', color='0.5', label='reinforce')
+        axs[2].plot(logging_iterations, iwae_reinforce['q_grad_std_history'], linestyle=':', color='0.5', label='reinforce')
+        axs[3].plot(logging_iterations, iwae_reinforce['p_mixture_probs_norm_history'], linestyle=':', color='0.5', label='reinforce')
+        axs[4].plot(logging_iterations, iwae_reinforce['posterior_norm_history'], linestyle=':', color='0.5', label='reinforce')
+        axs[5].plot(logging_iterations, iwae_reinforce['true_posterior_norm_history'], linestyle=':', color='0.5', label='reinforce')
 
     if args.all or args.vimco:
-        iwae_vimco_log_evidence_history, iwae_vimco_elbo_history, iwae_vimco_p_mixture_probs_ess_history, iwae_vimco_p_mixture_probs_norm_history, iwae_vimco_mean_multiplier_history, iwae_vimco_p_grad_std_history, iwae_vimco_q_grad_std_history = np_load('iwae_vimco_log_evidence_history'), np_load('iwae_vimco_elbo_history'), np_load('iwae_vimco_p_mixture_probs_ess_history'), np_load('iwae_vimco_p_mixture_probs_norm_history'), np_load('iwae_vimco_mean_multiplier_history'), np_load('iwae_vimco_p_grad_std_history'), np_load('iwae_vimco_q_grad_std_history')
+        iwae_vimco = dict(zip(
+            iwae_filenames,
+            map(
+                lambda iwae_filename: np_load('iwae_vimco_{}'.format(iwae_filename)),
+                iwae_filenames
+            )
+        ))
 
-        axs[0].plot(logging_iterations, iwae_vimco_log_evidence_history, linestyle=':', color='black', label='vimco')
-        axs[1].plot(logging_iterations, iwae_vimco_p_grad_std_history, linestyle=':', color='black', label='vimco')
-        axs[2].plot(logging_iterations, iwae_vimco_q_grad_std_history, linestyle=':', color='black', label='vimco')
-        axs[3].plot(logging_iterations, iwae_vimco_p_mixture_probs_norm_history, linestyle=':', color='black', label='vimco')
+        axs[0].plot(logging_iterations, iwae_vimco['log_evidence_history'], linestyle=':', color='black', label='vimco')
+        axs[1].plot(logging_iterations, iwae_vimco['p_grad_std_history'], linestyle=':', color='black', label='vimco')
+        axs[2].plot(logging_iterations, iwae_vimco['q_grad_std_history'], linestyle=':', color='black', label='vimco')
+        axs[3].plot(logging_iterations, iwae_vimco['p_mixture_probs_norm_history'], linestyle=':', color='black', label='vimco')
+        axs[4].plot(logging_iterations, iwae_vimco['posterior_norm_history'], linestyle=':', color='black', label='reinforce')
+        axs[5].plot(logging_iterations, iwae_vimco['true_posterior_norm_history'], linestyle=':', color='black', label='reinforce')
+
+    ## RWS
+    rws_filenames = ['log_evidence_history', 'posterior_norm_history', 'true_posterior_norm_history', 'p_mixture_probs_norm_history', 'mean_multiplier_history', 'p_grad_std_history', 'q_grad_std_history']
 
     if args.all or args.ws:
-        ws_log_evidence_history, ws_p_mixture_probs_ess_history, ws_p_mixture_probs_norm_history, ws_mean_multiplier_history, ws_p_grad_std_history, ws_q_grad_std_history = np_load('ws_log_evidence_history'), np_load('ws_p_mixture_probs_ess_history'), np_load('ws_p_mixture_probs_norm_history'), np_load('ws_mean_multiplier_history'), np_load('ws_p_grad_std_history'), np_load('ws_q_grad_std_history')
+        ws = dict(zip(
+            rws_filenames,
+            map(
+                lambda rws_filename: np_load('ws_{}'.format(rws_filename)),
+                rws_filenames
+            )
+        ))
 
-        axs[0].plot(logging_iterations, ws_log_evidence_history, linestyle='-.',color='0.5', label='ws')
-        axs[1].plot(logging_iterations, ws_p_grad_std_history, linestyle='-.',color='0.5', label='ws')
-        axs[2].plot(logging_iterations, ws_q_grad_std_history, linestyle='-.',color='0.5', label='ws')
-        axs[3].plot(logging_iterations, ws_p_mixture_probs_norm_history, linestyle='-.',color='0.5', label='ws')
+        axs[0].plot(logging_iterations, ws['log_evidence_history'], linestyle='-.',color='0.5', label='ws')
+        axs[1].plot(logging_iterations, ws['p_grad_std_history'], linestyle='-.',color='0.5', label='ws')
+        axs[2].plot(logging_iterations, ws['q_grad_std_history'], linestyle='-.',color='0.5', label='ws')
+        axs[3].plot(logging_iterations, ws['p_mixture_probs_norm_history'], linestyle='-.',color='0.5', label='ws')
+        axs[4].plot(logging_iterations, ws['posterior_norm_history'], linestyle='-.',color='0.5', label='ws')
+        axs[5].plot(logging_iterations, ws['true_posterior_norm_history'], linestyle='-.',color='0.5', label='ws')
 
     if args.all or args.ww:
-        ww_log_evidence_history, ww_p_mixture_probs_ess_history, ww_p_mixture_probs_norm_history, ww_mean_multiplier_history, ww_p_grad_std_history, ww_q_grad_std_history = np_load('ww_log_evidence_history'), np_load('ww_p_mixture_probs_ess_history'), np_load('ww_p_mixture_probs_norm_history'), np_load('ww_mean_multiplier_history'), np_load('ww_p_grad_std_history'), np_load('ww_q_grad_std_history')
+        ww = dict(zip(
+            rws_filenames,
+            map(
+                lambda rws_filename: np_load('ww_{}'.format(rws_filename)),
+                rws_filenames
+            )
+        ))
 
-        axs[0].plot(logging_iterations, ww_log_evidence_history, linestyle='--',color='0.8', label='ww')
-        axs[1].plot(logging_iterations, ww_p_grad_std_history, linestyle='--',color='0.8', label='ww')
-        axs[2].plot(logging_iterations, ww_q_grad_std_history, linestyle='--',color='0.8', label='ww')
-        axs[3].plot(logging_iterations, ww_p_mixture_probs_norm_history, linestyle='--',color='0.8', label='ww')
+        axs[0].plot(logging_iterations, ww['log_evidence_history'], linestyle='--',color='0.8', label='ww')
+        axs[1].plot(logging_iterations, ww['p_grad_std_history'], linestyle='--',color='0.8', label='ww')
+        axs[2].plot(logging_iterations, ww['q_grad_std_history'], linestyle='--',color='0.8', label='ww')
+        axs[3].plot(logging_iterations, ww['p_mixture_probs_norm_history'], linestyle='--',color='0.8', label='ww')
+        axs[4].plot(logging_iterations, ww['posterior_norm_history'], linestyle='--',color='0.8', label='ww')
+        axs[5].plot(logging_iterations, ww['true_posterior_norm_history'], linestyle='--',color='0.8', label='ww')
 
     if args.all or args.wsw:
-        wsw_log_evidence_history, wsw_p_mixture_probs_ess_history, wsw_p_mixture_probs_norm_history, wsw_mean_multiplier_history, wsw_p_grad_std_history, wsw_q_grad_std_history = np_load('wsw_log_evidence_history'), np_load('wsw_p_mixture_probs_ess_history'), np_load('wsw_p_mixture_probs_norm_history'), np_load('wsw_mean_multiplier_history'), np_load('wsw_p_grad_std_history'), np_load('wsw_q_grad_std_history')
+        wsw = dict(zip(
+            rws_filenames,
+            map(
+                lambda rws_filename: np_load('wsw_{}'.format(rws_filename)),
+                rws_filenames
+            )
+        ))
 
-        axs[0].plot(logging_iterations, wsw_log_evidence_history, linestyle='--',color='0.5', label='wsw')
-        axs[1].plot(logging_iterations, wsw_p_grad_std_history, linestyle='--',color='0.5', label='wsw')
-        axs[2].plot(logging_iterations, wsw_q_grad_std_history, linestyle='--',color='0.5', label='wsw')
-        axs[3].plot(logging_iterations, wsw_p_mixture_probs_norm_history, linestyle='--',color='0.5', label='wsw')
+        axs[0].plot(logging_iterations, wsw['log_evidence_history'], linestyle='--',color='0.5', label='wsw')
+        axs[1].plot(logging_iterations, wsw['p_grad_std_history'], linestyle='--',color='0.5', label='wsw')
+        axs[2].plot(logging_iterations, wsw['q_grad_std_history'], linestyle='--',color='0.5', label='wsw')
+        axs[3].plot(logging_iterations, wsw['p_mixture_probs_norm_history'], linestyle='--',color='0.5', label='wsw')
+        axs[4].plot(logging_iterations, wsw['posterior_norm_history'], linestyle='--',color='0.5', label='wsw')
+        axs[5].plot(logging_iterations, wsw['true_posterior_norm_history'], linestyle='--',color='0.5', label='wsw')
 
     if args.all or args.wswa:
-        wswa_log_evidence_history, wswa_p_mixture_probs_ess_history, wswa_p_mixture_probs_norm_history, wswa_mean_multiplier_history, wswa_p_grad_std_history, wswa_q_grad_std_history = np_load('wswa_log_evidence_history'), np_load('wswa_p_mixture_probs_ess_history'), np_load('wswa_p_mixture_probs_norm_history'), np_load('wswa_mean_multiplier_history'), np_load('wswa_p_grad_std_history'), np_load('wswa_q_grad_std_history')
+        wswa = dict(zip(
+            rws_filenames,
+            map(
+                lambda rws_filename: np_load('wswa_{}'.format(rws_filename)),
+                rws_filenames
+            )
+        ))
 
-        axs[0].plot(logging_iterations, wswa_log_evidence_history, linestyle='-',color='0.5', label='wswa')
-        axs[1].plot(logging_iterations, wswa_p_grad_std_history, linestyle='-',color='0.5', label='wswa')
-        axs[2].plot(logging_iterations, wswa_q_grad_std_history, linestyle='-',color='0.5', label='wswa')
-        axs[3].plot(logging_iterations, wswa_p_mixture_probs_norm_history, linestyle='-',color='0.5', label='wswa')
+        axs[0].plot(logging_iterations, wswa['log_evidence_history'], linestyle='-',color='0.5', label='wswa')
+        axs[1].plot(logging_iterations, wswa['p_grad_std_history'], linestyle='-',color='0.5', label='wswa')
+        axs[2].plot(logging_iterations, wswa['q_grad_std_history'], linestyle='-',color='0.5', label='wswa')
+        axs[3].plot(logging_iterations, wswa['p_mixture_probs_norm_history'], linestyle='-',color='0.5', label='wswa')
+        axs[4].plot(logging_iterations, wswa['posterior_norm_history'], linestyle='-',color='0.5', label='wswa')
+        axs[5].plot(logging_iterations, wswa['true_posterior_norm_history'], linestyle='-',color='0.5', label='wswa')
 
     axs[0].axhline(true_log_evidence, linestyle='-', color='black', label='true')
     axs[0].set_ylabel('Avg. test\nlog evidence')
@@ -93,7 +147,11 @@ def main(args):
     axs[2].set_ylabel('Avg. std. of $\phi$ \n gradient est.')
 
     axs[3].set_ylim(0)
-    axs[3].set_ylabel('Norm of mixture probs.\n to true mixture probs.')
+    axs[3].set_ylabel('L2 of mixture probs.\n to true mixture probs.')
+
+    axs[4].set_ylabel('L2 of q to current p')
+
+    axs[5].set_ylabel('L2 of q to true p')
 
     axs[-1].legend(ncol=4, loc='upper center', bbox_to_anchor=(0.5, -0.4))
     axs[-1].set_xlabel('Iteration')
