@@ -114,9 +114,9 @@ class GenerativeNetwork(nn.Module):
         super(GenerativeNetwork, self).__init__()
         self.num_mixtures = len(init_mixture_probs_pre_softmax)
         self.mixture_probs_pre_softmax = nn.Parameter(torch.Tensor(init_mixture_probs_pre_softmax))
-        self.mean_multiplier = Variable(torch.Tensor([init_mean_multiplier]))
+        self.mean_multiplier = Variable(torch.Tensor([init_mean_multiplier]).cuda()) if CUDA else Variable(torch.Tensor([init_mean_multiplier]))
         # self.means = Variable(torch.Tensor(means))
-        self.log_stds = Variable(torch.Tensor(init_log_stds))
+        self.log_stds = Variable(torch.Tensor(init_log_stds)) if CUDA else Variable(torch.Tensor([init_log_stds]))
 
     def get_z_params(self):
         return F.softmax(self.mixture_probs_pre_softmax, dim=0)
@@ -173,7 +173,7 @@ class GenerativeNetwork(nn.Module):
 
     def posterior(self, x):
         num_samples = len(x)
-        z = Variable(torch.arange(self.num_mixtures).long())
+        z = Variable(torch.arange(self.num_mixtures).type_as(self.mixture_probs_pre_softmax.data).long())
         log_evidence = self.log_evidence(x)
 
         z_expanded = z.unsqueeze(0).expand(num_samples, self.num_mixtures)
