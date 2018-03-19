@@ -1,3 +1,4 @@
+from collections import OrderedDict
 from torch.autograd import Variable
 
 import uuid
@@ -297,7 +298,7 @@ def train_iwae(
     p_init_mixture_probs_pre_softmax, init_mean_multiplier, init_log_stds,
     true_p_mixture_probs, true_mean_multiplier, true_log_stds, test_x,
     num_iterations, num_samples, num_particles, num_mc_samples,
-    gradient_estimator, learning_rate, logging_interval
+    gradient_estimator, learning_rate, logging_interval, saving_interval
 ):
     log_evidence_history = []
     elbo_history = []
@@ -323,6 +324,14 @@ def train_iwae(
 
         loss.backward()
         optimizer.step()
+
+        if i % saving_interval == 0:
+            filename = safe_fname('{}_{}'.format(gradient_estimator, i), 'pt')
+            torch.save(
+                OrderedDict((name, tensor.cpu()) for name, tensor in iwae.state_dict().items()),
+                filename
+            )
+            print('Saved to {}'.format(filename))
 
         if i % logging_interval == 0:
             elbo_history.append(elbo.data[0])
@@ -398,7 +407,7 @@ def train_rws(
     true_p_mixture_probs, true_mean_multiplier, true_log_stds, test_x,
     mode,
     num_iterations, num_samples, num_particles, num_mc_samples, learning_rate,
-    logging_interval
+    logging_interval, saving_interval
 ):
     log_evidence_history = []
     p_mixture_probs_ess_history = []
@@ -453,6 +462,14 @@ def train_rws(
             phi_optimizer.step()
         else:
             raise AttributeError('Mode must be one of ws, ww, wsw. Got: {}'.format(mode))
+
+        if i % saving_interval == 0:
+            filename = safe_fname('{}_{}'.format(gradient_estimator, i), 'pt')
+            torch.save(
+                OrderedDict((name, tensor.cpu()) for name, tensor in rws.state_dict().items()),
+                filename
+            )
+            print('Saved to {}'.format(filename))
 
         if i % logging_interval == 0:
             log_evidence_history.append(torch.mean(rws.generative_network.log_evidence(test_x)).data[0])
@@ -543,29 +560,30 @@ def main(args):
 
     print('true_log_evidence = {}'.format(true_log_evidence))
     filename = 'true_log_evidence'
-    np.save(safe_fname(filename), true_log_evidence)
+    np.save(safe_fname(filename, 'npy'), true_log_evidence)
     print('Saved to {}'.format(filename))
 
     true_ess = 1 / np.sum(true_p_mixture_probs**2)
     print('true_ess = {}'.format(true_ess))
     filename = 'true_ess'
-    np.save(safe_fname(filename), true_ess)
+    np.save(safe_fname(filename, 'npy'), true_ess)
     print('Saved to {}'.format(filename))
 
     learning_rate = 1e-3
-    num_iterations = 50000
+    num_iterations = 30000
     logging_interval = 2000
+    saving_interval = 10000
 
     filename = 'num_mixtures'
-    np.save(safe_fname(filename), num_mixtures)
+    np.save(safe_fname(filename, 'npy'), num_mixtures)
     print('Saved to {}'.format(filename))
 
     filename = 'logging_interval'
-    np.save(safe_fname(filename), logging_interval)
+    np.save(safe_fname(filename, 'npy'), logging_interval)
     print('Saved to {}'.format(filename))
 
     filename = 'num_iterations'
-    np.save(safe_fname(filename), num_iterations)
+    np.save(safe_fname(filename, 'npy'), num_iterations)
     print('Saved to {}'.format(filename))
 
     # IWAE
@@ -578,13 +596,13 @@ def main(args):
             true_p_mixture_probs, true_mean_multiplier, true_log_stds, test_x,
             num_iterations, num_samples, num_particles, num_mc_samples,
             gradient_estimator, learning_rate,
-            logging_interval
+            logging_interval, saving_interval
         )
         for [data, filename] in zip(
             [iwae_reinforce_log_evidence_history, iwae_reinforce_elbo_history, iwae_reinforce_p_mixture_probs_ess_history, iwae_reinforce_p_mixture_probs_norm_history, iwae_reinforce_mean_multiplier_history, iwae_reinforce_p_grad_std_history, iwae_reinforce_q_grad_std_history],
             ['iwae_reinforce_log_evidence_history', 'iwae_reinforce_elbo_history', 'iwae_reinforce_p_mixture_probs_ess_history', 'iwae_reinforce_p_mixture_probs_norm_history', 'iwae_reinforce_mean_multiplier_history', 'iwae_reinforce_p_grad_std_history', 'iwae_reinforce_q_grad_std_history']
         ):
-            np.save(safe_fname(filename), data)
+            np.save(safe_fname(filename, 'npy'), data)
             print('Saved to {}'.format(filename))
 
     ## VIMCO
@@ -595,13 +613,13 @@ def main(args):
             true_p_mixture_probs, true_mean_multiplier, true_log_stds, test_x,
             num_iterations, num_samples, num_particles, num_mc_samples,
             gradient_estimator, learning_rate,
-            logging_interval
+            logging_interval, saving_interval
         )
         for [data, filename] in zip(
             [iwae_vimco_log_evidence_history, iwae_vimco_elbo_history, iwae_vimco_p_mixture_probs_ess_history, iwae_vimco_p_mixture_probs_norm_history, iwae_vimco_mean_multiplier_history, iwae_vimco_p_grad_std_history, iwae_vimco_q_grad_std_history],
             ['iwae_vimco_log_evidence_history', 'iwae_vimco_elbo_history', 'iwae_vimco_p_mixture_probs_ess_history', 'iwae_vimco_p_mixture_probs_norm_history', 'iwae_vimco_mean_multiplier_history', 'iwae_vimco_p_grad_std_history', 'iwae_vimco_q_grad_std_history']
         ):
-            np.save(safe_fname(filename), data)
+            np.save(safe_fname(filename, 'npy'), data)
             print('Saved to {}'.format(filename))
 
     ## Relax
@@ -616,13 +634,13 @@ def main(args):
             true_p_mixture_probs, true_mean_multiplier, true_log_stds, test_x,
             mode,
             num_iterations, num_samples, num_particles, num_mc_samples, learning_rate,
-            logging_interval
+            logging_interval, saving_interval
         )
         for [data, filename] in zip(
             [ws_log_evidence_history, ws_p_mixture_probs_ess_history, ws_p_mixture_probs_norm_history, ws_mean_multiplier_history, ws_p_grad_std_history, ws_q_grad_std_history],
             ['ws_log_evidence_history', 'ws_p_mixture_probs_ess_history', 'ws_p_mixture_probs_norm_history', 'ws_mean_multiplier_history', 'ws_p_grad_std_history', 'ws_q_grad_std_history']
         ):
-            np.save(safe_fname(filename), data)
+            np.save(safe_fname(filename, 'npy'), data)
             print('Saved to {}'.format(filename))
 
     ## WW
@@ -633,13 +651,13 @@ def main(args):
             true_p_mixture_probs, true_mean_multiplier, true_log_stds, test_x,
             mode,
             num_iterations, num_samples, num_particles, num_mc_samples, learning_rate,
-            logging_interval
+            logging_interval, saving_interval
         )
         for [data, filename] in zip(
             [ww_log_evidence_history, ww_p_mixture_probs_ess_history, ww_p_mixture_probs_norm_history, ww_mean_multiplier_history, ww_p_grad_std_history, ww_q_grad_std_history],
             ['ww_log_evidence_history', 'ww_p_mixture_probs_ess_history', 'ww_p_mixture_probs_norm_history', 'ww_mean_multiplier_history', 'ww_p_grad_std_history', 'ww_q_grad_std_history']
         ):
-            np.save(safe_fname(filename), data)
+            np.save(safe_fname(filename, 'npy'), data)
             print('Saved to {}'.format(filename))
 
     ## WSW
@@ -650,13 +668,13 @@ def main(args):
             true_p_mixture_probs, true_mean_multiplier, true_log_stds, test_x,
             mode,
             num_iterations, num_samples, num_particles, num_mc_samples, learning_rate,
-            logging_interval
+            logging_interval, saving_interval
         )
         for [data, filename] in zip(
             [wsw_log_evidence_history, wsw_p_mixture_probs_ess_history, wsw_p_mixture_probs_norm_history, wsw_mean_multiplier_history, wsw_p_grad_std_history, wsw_q_grad_std_history],
             ['wsw_log_evidence_history', 'wsw_p_mixture_probs_ess_history', 'wsw_p_mixture_probs_norm_history', 'wsw_mean_multiplier_history', 'wsw_p_grad_std_history', 'wsw_q_grad_std_history']
         ):
-            np.save(safe_fname(filename), data)
+            np.save(safe_fname(filename, 'npy'), data)
             print('Saved to {}'.format(filename))
 
     ## WSWA
@@ -667,13 +685,13 @@ def main(args):
             true_p_mixture_probs, true_mean_multiplier, true_log_stds, test_x,
             mode,
             num_iterations, num_samples, num_particles, num_mc_samples, learning_rate,
-            logging_interval
+            logging_interval, saving_interval
         )
         for [data, filename] in zip(
             [wswa_log_evidence_history, wswa_p_mixture_probs_ess_history, wswa_p_mixture_probs_norm_history, wswa_mean_multiplier_history, wswa_p_grad_std_history, wswa_q_grad_std_history],
             ['wswa_log_evidence_history', 'wswa_p_mixture_probs_ess_history', 'wswa_p_mixture_probs_norm_history', 'wswa_mean_multiplier_history', 'wswa_p_grad_std_history', 'wswa_q_grad_std_history']
         ):
-            np.save(safe_fname(filename), data)
+            np.save(safe_fname(filename, 'npy'), data)
             print('Saved to {}'.format(filename))
 
 
@@ -683,8 +701,8 @@ SEED = 1
 UID = str(uuid.uuid4())[:8]
 
 
-def safe_fname(fname):
-    return '{}_{:d}_{}.npy'.format(fname, SEED, UID)
+def safe_fname(fname, ext):
+    return '{}_{:d}_{}.{}'.format(fname, SEED, UID, ext)
 
 
 def reset_seed():
