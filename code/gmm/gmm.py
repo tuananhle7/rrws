@@ -9,7 +9,7 @@ import torch.nn.functional as F
 
 iwae_optim = torch.optim.Adam
 iwae_optim_params = {'lr': 1e-3}
-rws_optim = torch.optim.Adam  # SGD
+rws_optim = torch.optim.SGD  # SGD
 # rws_optim_params = {'lr': 1e-3, 'nesterov': True, 'momentum': 0.7}
 rws_optim_params = {'lr': 1e-3}
 
@@ -107,10 +107,6 @@ def logsumexp(values, dim=0, keepdim=False):
 def generate_obs(num_samples, generative_network):
     z, x = generative_network.sample(num_samples)
     return x.detach()
-
-
-def kl(p1, p2, dim):
-    return torch.sum(p1 * (torch.log(p1) - torch.log(p2)), dim=dim)
 
 
 class GenerativeNetwork(nn.Module):
@@ -317,17 +313,12 @@ def train_iwae(
     p_init_mixture_probs_pre_softmax, init_mean_multiplier, init_log_stds,
     true_p_mixture_probs, true_mean_multiplier, true_log_stds, test_x,
     num_iterations, num_samples, num_particles, num_mc_samples,
-    gradient_estimator, learning_rate, logging_interval, saving_interval
+    gradient_estimator, logging_interval, saving_interval
 ):
     log_evidence_history = []
     elbo_history = []
-    # posterior_kl_qp_history = []
-    # true_posterior_qp_kl_history = []
-    # posterior_kl_pq_history = []
-    # true_posterior_kl_pq_history = []
     posterior_norm_history = []
     true_posterior_norm_history = []
-    # p_mixture_probs_ess_history = []
     p_mixture_probs_norm_history = []
     mean_multiplier_history = []
     p_grad_std_history = []
@@ -365,16 +356,10 @@ def train_iwae(
 
             q_posterior = iwae.inference_network.get_z_params(test_x)
             p_posterior = iwae.generative_network.posterior(test_x)
-
-            # posterior_kl_qp_history.append(torch.mean(kl(q_posterior, p_posterior, dim=1)).data[0])
-            # true_posterior_kl_qp_history.append(torch.mean(kl(q_posterior, true_posterior, dim=1)).data[0])
-            # posterior_kl_pq_history.append(torch.mean(kl(p_posterior, q_posterior, dim=1)).data[0])
-            # true_posterior_kl_pq_history.append(torch.mean(kl(true_posterior, q_posterior, dim=1)).data[0])
             posterior_norm_history.append(torch.mean(torch.norm(q_posterior - p_posterior, p=2, dim=1)).data[0])
             true_posterior_norm_history.append(torch.mean(torch.norm(q_posterior - true_posterior, p=2, dim=1)).data[0])
 
             p_mixture_probs = iwae.generative_network.get_z_params().data.cpu().numpy()
-            # p_mixture_probs_ess_history.append(1 / np.sum(p_mixture_probs**2))
             p_mixture_probs_norm_history.append(np.linalg.norm(p_mixture_probs - true_p_mixture_probs))
             mean_multiplier_history.append(iwae.generative_network.mean_multiplier.data[0])
 
@@ -445,17 +430,12 @@ def train_rws(
     p_init_mixture_probs_pre_softmax, init_mean_multiplier, init_log_stds,
     true_p_mixture_probs, true_mean_multiplier, true_log_stds, test_x,
     mode,
-    num_iterations, num_samples, num_particles, num_mc_samples, learning_rate,
+    num_iterations, num_samples, num_particles, num_mc_samples,
     logging_interval, saving_interval
 ):
     log_evidence_history = []
-    # posterior_kl_qp_history = []
-    # true_posterior_qp_kl_history = []
-    # posterior_kl_pq_history = []
-    # true_posterior_kl_pq_history = []
     posterior_norm_history = []
     true_posterior_norm_history = []
-    # p_mixture_probs_ess_history = []
     p_mixture_probs_norm_history = []
     mean_multiplier_history = []
     p_grad_std_history = []
@@ -522,11 +502,6 @@ def train_rws(
 
             q_posterior = rws.inference_network.get_z_params(test_x)
             p_posterior = rws.generative_network.posterior(test_x)
-
-            # posterior_kl_qp_history.append(torch.mean(kl(q_posterior, p_posterior, dim=1)).data[0])
-            # true_posterior_kl_qp_history.append(torch.mean(kl(q_posterior, true_posterior, dim=1)).data[0])
-            # posterior_kl_pq_history.append(torch.mean(kl(p_posterior, q_posterior, dim=1)).data[0])
-            # true_posterior_kl_pq_history.append(torch.mean(kl(true_posterior, q_posterior, dim=1)).data[0])
             posterior_norm_history.append(torch.mean(torch.norm(q_posterior - p_posterior, p=2, dim=1)).data[0])
             true_posterior_norm_history.append(torch.mean(torch.norm(q_posterior - true_posterior, p=2, dim=1)).data[0])
 
@@ -622,15 +597,8 @@ def main(args):
     np.save(safe_fname(filename, 'npy'), true_log_evidence)
     print('Saved to {}'.format(filename))
 
-    # true_ess = 1 / np.sum(true_p_mixture_probs**2)
-    # print('true_ess = {}'.format(true_ess))
-    # filename = 'true_ess'
-    # np.save(safe_fname(filename, 'npy'), true_ess)
-    # print('Saved to {}'.format(filename))
-
-    learning_rate = 1e-3
     num_iterations = 30000
-    logging_interval = 2000
+    logging_interval = 1000
     saving_interval = 10000
 
     filename = 'num_mixtures'
@@ -657,7 +625,7 @@ def main(args):
                 p_init_mixture_probs_pre_softmax, init_mean_multiplier, init_log_stds,
                 true_p_mixture_probs, true_mean_multiplier, true_log_stds, test_x,
                 num_iterations, num_samples, num_particles, num_mc_samples,
-                gradient_estimator, learning_rate,
+                gradient_estimator,
                 logging_interval, saving_interval
             )),
             iwae_filenames
@@ -674,7 +642,7 @@ def main(args):
                 p_init_mixture_probs_pre_softmax, init_mean_multiplier, init_log_stds,
                 true_p_mixture_probs, true_mean_multiplier, true_log_stds, test_x,
                 num_iterations, num_samples, num_particles, num_mc_samples,
-                gradient_estimator, learning_rate,
+                gradient_estimator,
                 logging_interval, saving_interval
             )),
             iwae_filenames
@@ -696,7 +664,7 @@ def main(args):
                 p_init_mixture_probs_pre_softmax, init_mean_multiplier, init_log_stds,
                 true_p_mixture_probs, true_mean_multiplier, true_log_stds, test_x,
                 mode,
-                num_iterations, num_samples, num_particles, num_mc_samples, learning_rate,
+                num_iterations, num_samples, num_particles, num_mc_samples,
                 logging_interval, saving_interval
             )),
             rws_filenames
@@ -713,7 +681,7 @@ def main(args):
                 p_init_mixture_probs_pre_softmax, init_mean_multiplier, init_log_stds,
                 true_p_mixture_probs, true_mean_multiplier, true_log_stds, test_x,
                 mode,
-                num_iterations, num_samples, num_particles, num_mc_samples, learning_rate,
+                num_iterations, num_samples, num_particles, num_mc_samples,
                 logging_interval, saving_interval
             )),
             rws_filenames
@@ -730,7 +698,7 @@ def main(args):
                 p_init_mixture_probs_pre_softmax, init_mean_multiplier, init_log_stds,
                 true_p_mixture_probs, true_mean_multiplier, true_log_stds, test_x,
                 mode,
-                num_iterations, num_samples, num_particles, num_mc_samples, learning_rate,
+                num_iterations, num_samples, num_particles, num_mc_samples,
                 logging_interval, saving_interval
             )),
             rws_filenames
@@ -747,7 +715,7 @@ def main(args):
                 p_init_mixture_probs_pre_softmax, init_mean_multiplier, init_log_stds,
                 true_p_mixture_probs, true_mean_multiplier, true_log_stds, test_x,
                 mode,
-                num_iterations, num_samples, num_particles, num_mc_samples, learning_rate,
+                num_iterations, num_samples, num_particles, num_mc_samples,
                 logging_interval, saving_interval
             )),
             rws_filenames
