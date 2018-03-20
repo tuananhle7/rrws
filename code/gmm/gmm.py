@@ -513,7 +513,6 @@ def train_rws(
             true_posterior_norm_history.append(torch.mean(torch.norm(q_posterior - true_posterior, p=2, dim=1)).data[0])
 
             p_mixture_probs = rws.generative_network.get_z_params().data.cpu().numpy()
-            # p_mixture_probs_ess_history.append(1 / np.sum(p_mixture_probs**2))
             p_mixture_probs_norm_history.append(np.linalg.norm(p_mixture_probs - true_p_mixture_probs))
             mean_multiplier_history.append(rws.generative_network.mean_multiplier.data[0])
 
@@ -564,8 +563,8 @@ def train_rws(
             q_grad_std_history.append(q_grad_stats[1])
             q_grad_mean_history.append(q_grad_stats[0])
 
-            print('Iteration {}: log_evidence = {}, norm = {}'.format(
-                i, log_evidence_history[-1], p_mixture_probs_norm_history[-1]
+            print('Iteration {}: phi-loss = {}, log_evidence = {}, norm = {}'.format(
+                i, loss.data[0], log_evidence_history[-1], p_mixture_probs_norm_history[-1]
             ))
 
     return tuple(map(np.array, [
