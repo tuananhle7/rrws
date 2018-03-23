@@ -7,13 +7,16 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-iwae_optim = torch.optim.Adam
-iwae_optim_params = {'lr': 1e-3}
-rws_theta_optim = torch.optim.Adam  # SGD
-rws_phi_optim = torch.optim.SGD
+iwae_theta_optim = torch.optim.SGD
+iwae_phi_optim = torch.optim.Adam
+iwae_theta_optim_params = {'lr': 1e-1}
+iwae_phi_optim_params = {'lr': 1e-3}
+rws_theta_optim = torch.optim.SGD  # SGD
+rws_phi_optim = torch.optim.Adam
 # rws_optim_params = {'lr': 1e-3, 'nesterov': True, 'momentum': 0.7}
-rws_theta_optim_params = {'lr': 1e-3}
-rws_phi_optim_params = {'lr': 1}
+rws_theta_optim_params = {'lr': 1e-1}
+rws_phi_optim_params = {'lr': 1e-3}
+softmax_multiplier = 0.5
 
 
 class OnlineMeanStd():
@@ -118,10 +121,10 @@ class GenerativeNetwork(nn.Module):
         self.mixture_probs_pre_softmax = nn.Parameter(torch.Tensor(init_mixture_probs_pre_softmax))
         self.mean_multiplier = Variable(torch.Tensor([init_mean_multiplier]).cuda()) if CUDA else Variable(torch.Tensor([init_mean_multiplier]))
         # self.means = Variable(torch.Tensor(means))
-        self.log_stds = Variable(torch.Tensor(init_log_stds).cuda()) if CUDA else Variable(torch.Tensor([init_log_stds]))
+        self.log_stds = Variable(torch.Tensor(init_log_stds).cuda()) if CUDA else Variable(torch.Tensor(init_log_stds))
 
     def get_z_params(self):
-        return F.softmax(self.mixture_probs_pre_softmax, dim=0)
+        return F.softmax(self.mixture_probs_pre_softmax * softmax_multiplier, dim=0)
 
     def get_x_params(self):
         return self.mean_multiplier * Variable(torch.arange(self.num_mixtures).type_as(self.mixture_probs_pre_softmax.data)), torch.exp(self.log_stds)
@@ -194,19 +197,10 @@ class InferenceNetwork(nn.Module):
         super(InferenceNetwork, self).__init__()
         self.num_mixtures = num_mixtures
         self.mlp = nn.Sequential(
-            # nn.Linear(1, 16),
-            # nn.ELU(),  # nn.Tanh(),
-            # nn.Linear(16, 32),
-            # nn.ELU(),  # nn.Tanh(),
-            # nn.Linear(32, 16),
-            # nn.ELU(),  # nn.Tanh(),
-            # nn.Linear(16, self.num_mixtures),
-            # nn.Softmax(dim=1)
-            #
             nn.Linear(1, 16),
-            nn.Tanh(),
+            nn.Sigmoid(),
             nn.Linear(16, 16),
-            nn.Tanh(),
+            nn.Sigmoid(),
             nn.Linear(16, self.num_mixtures),
             nn.Softmax(dim=1)
         )
@@ -329,8 +323,9 @@ def train_iwae(
 
     reset_seed()
     iwae = IWAE(p_init_mixture_probs_pre_softmax, init_mean_multiplier, init_log_stds)
-    optimizer = iwae_optim(iwae.parameters(), **iwae_optim_params)
-    true_generative_network = GenerativeNetwork(np.log(true_p_mixture_probs), true_mean_multiplier, true_log_stds)
+    theta_optimizer = iwae_theta_optim(iwae.generative_network.parameters(), **iwae_theta_optim_params)
+    phi_optimizer = iwae_phi_optim(iwae.inference_network.parameters(), **iwae_phi_optim_params)
+    true_generative_network = GenerativeNetwork(np.log(true_p_mixture_probs) / softmax_multiplier, true_mean_multiplier, true_log_stds)
     if CUDA:
         iwae.cuda()
         true_generative_network.cuda()
@@ -339,11 +334,12 @@ def train_iwae(
     for i in range(num_iterations):
         x = generate_obs(num_samples, true_generative_network)
 
-        optimizer.zero_grad()
+        theta_optimizer.zero_grad()
+        phi_optimizer.zero_grad()
         loss, elbo = iwae(x, gradient_estimator, num_particles)
-
         loss.backward()
-        optimizer.step()
+        theta_optimizer.step()
+        phi_optimizer.step()
 
         if i % saving_interval == 0:
             filename = safe_fname('{}_{}'.format(gradient_estimator, i), 'pt')
@@ -380,8 +376,8 @@ def train_iwae(
             q_grad_std_history.append(q_grad_stats[1])
             q_grad_mean_history.append(q_grad_stats[0])
 
-            print('Iteration {}: elbo = {}, log_evidence = {}, norm = {}'.format(
-                i, elbo_history[-1], log_evidence_history[-1], p_mixture_probs_norm_history[-1]
+            print('Iteration {}: elbo = {}, log_evidence = {}, L2(p, true p) = {}, L2(q, current p) = {}'.format(
+                i, elbo_history[-1], log_evidence_history[-1], p_mixture_probs_norm_history[-1], posterior_norm_history[-1]
             ))
 
     return tuple(map(np.array, [
@@ -390,11 +386,12 @@ def train_iwae(
 
 
 class RWS(nn.Module):
-    def __init__(self, p_init_mixture_probs_pre_softmax, init_mean_multiplier, init_log_stds):
+    def __init__(self, p_init_mixture_probs_pre_softmax, init_mean_multiplier, init_log_stds, true_generative_network=None):
         super(RWS, self).__init__()
         self.num_mixtures = len(init_log_stds)
         self.generative_network = GenerativeNetwork(p_init_mixture_probs_pre_softmax, init_mean_multiplier, init_log_stds)
         self.inference_network = InferenceNetwork(self.num_mixtures)
+        self.true_generative_network = true_generative_network
 
     def wake_theta(self, x, num_particles=1):
         x_expanded = x.unsqueeze(-1).expand(-1, num_particles)
@@ -416,8 +413,9 @@ class RWS(nn.Module):
         x_expanded_flattened = x_expanded.contiguous().view(-1)
         z_expanded_flattened = self.inference_network.sample(x_expanded_flattened)
         log_p = self.generative_network.logpdf(z_expanded_flattened, x_expanded_flattened).view(-1, num_particles)
+        log_p_true = 0 if self.true_generative_network is None else self.true_generative_network.log_evidence(x_expanded_flattened).view(-1, num_particles)
         log_q = self.inference_network.logpdf(z_expanded_flattened, x_expanded_flattened).view(-1, num_particles)
-        log_weight = log_p - log_q
+        log_weight = log_p - log_q - log_p_true
         normalized_weight = torch.exp(lognormexp(log_weight, dim=1))
         return -torch.sum(normalized_weight.detach() * log_q, dim=1)
 
@@ -448,16 +446,16 @@ def train_rws(
     q_grad_std_history = []
     q_grad_mean_history = []
 
-    reset_seed()
-    rws = RWS(p_init_mixture_probs_pre_softmax, init_mean_multiplier, init_log_stds)
-    theta_optimizer = rws_theta_optim(rws.generative_network.parameters(), **rws_theta_optim_params)
-    phi_optimizer = rws_phi_optim(rws.inference_network.parameters(), **rws_phi_optim_params)
-
-    true_generative_network = GenerativeNetwork(np.log(true_p_mixture_probs), true_mean_multiplier, true_log_stds)
+    true_generative_network = GenerativeNetwork(np.log(true_p_mixture_probs) / softmax_multiplier, true_mean_multiplier, true_log_stds)
     if CUDA:
         rws.cuda()
         true_generative_network.cuda()
     true_posterior = true_generative_network.posterior(test_x)
+
+    reset_seed()
+    rws = RWS(p_init_mixture_probs_pre_softmax, init_mean_multiplier, init_log_stds) # true_generative_network)
+    theta_optimizer = rws_theta_optim(rws.generative_network.parameters(), **rws_theta_optim_params)
+    phi_optimizer = rws_phi_optim(rws.inference_network.parameters(), **rws_phi_optim_params)
 
     for i in range(num_iterations):
         x = generate_obs(num_samples, true_generative_network)
@@ -471,7 +469,7 @@ def train_rws(
         # Phi update
         if mode == 'ws':
             phi_optimizer.zero_grad()
-            loss = rws('sleep_phi', num_samples=num_particles)
+            loss = rws('sleep_phi', num_samples=num_samples)
             loss.backward()
             phi_optimizer.step()
         elif mode == 'ww':
@@ -481,12 +479,12 @@ def train_rws(
             phi_optimizer.step()
         elif mode == 'wsw':
             phi_optimizer.zero_grad()
-            loss = 0.5 * rws('sleep_phi', num_samples=num_particles) + 0.5 * rws('wake_phi', x=x, num_particles=num_particles)
+            loss = 0.5 * rws('sleep_phi', num_samples=num_samples) + 0.5 * rws('wake_phi', x=x, num_particles=num_particles)
             loss.backward()
             phi_optimizer.step()
         elif mode == 'wswa':
             phi_optimizer.zero_grad()
-            s_loss = rws('sleep_phi', num_samples=num_particles)
+            s_loss = rws('sleep_phi', num_samples=num_samples)
             w_loss = rws('wake_phi', x=x, num_particles=num_particles)
             d = torch.abs(s_loss - w_loss)
             alpha = 1 - d.neg().exp().data[0]
@@ -528,7 +526,7 @@ def train_rws(
                 q_online_mean_std = OnlineMeanStd()
                 for mc_sample_idx in range(num_mc_samples):
                     rws.inference_network.zero_grad()
-                    loss = rws('sleep_phi', num_samples=num_particles)
+                    loss = rws('sleep_phi', num_samples=num_samples)
                     loss.backward()
                     q_online_mean_std.update([p.grad for p in rws.inference_network.parameters()])
             elif mode == 'ww':
@@ -542,14 +540,14 @@ def train_rws(
                 q_online_mean_std = OnlineMeanStd()
                 for mc_sample_idx in range(num_mc_samples):
                     rws.inference_network.zero_grad()
-                    loss = 0.5 * rws('sleep_phi', num_samples=num_particles) + 0.5 * rws('wake_phi', x=test_x, num_particles=num_particles)
+                    loss = 0.5 * rws('sleep_phi', num_samples=num_samples) + 0.5 * rws('wake_phi', x=test_x, num_particles=num_particles)
                     loss.backward()
                     q_online_mean_std.update([p.grad for p in rws.inference_network.parameters()])
             elif mode == 'wswa':
                 q_online_mean_std = OnlineMeanStd()
                 for mc_sample_idx in range(num_mc_samples):
                     rws.inference_network.zero_grad()
-                    s_loss = rws('sleep_phi', num_samples=num_particles)
+                    s_loss = rws('sleep_phi', num_samples=num_samples)
                     w_loss = rws('wake_phi', x=x, num_particles=num_particles)
                     d = torch.abs(s_loss - w_loss)
                     alpha = 1 - d.neg().exp().data[0]
@@ -563,8 +561,8 @@ def train_rws(
             q_grad_std_history.append(q_grad_stats[1])
             q_grad_mean_history.append(q_grad_stats[0])
 
-            print('Iteration {}: phi-loss = {}, log_evidence = {}, norm = {}'.format(
-                i, loss.data[0], log_evidence_history[-1], p_mixture_probs_norm_history[-1]
+            print('Iteration {}: phi-loss = {}, log_evidence = {}, L2(p, true p) = {}, L2(q, current p) = {}'.format(
+                i, loss.data[0], log_evidence_history[-1], p_mixture_probs_norm_history[-1], posterior_norm_history[-1]
             ))
 
     return tuple(map(np.array, [
@@ -573,51 +571,40 @@ def train_rws(
 
 
 def main(args):
-    num_mixtures = 20
+    num_iterations = 10000
+    logging_interval = 100
+    saving_interval = 100
 
-    # uniform_p_mixture_probs = np.array([1 / num_mixtures for _ in range(num_mixtures)])
-    # temp = np.exp(np.arange(num_mixtures) + 1e-3)
-    temp = np.arange(num_mixtures) + 1e-3
+    num_mixtures = 5
+
+    temp = np.arange(num_mixtures) + 5
     true_p_mixture_probs = temp / np.sum(temp)
-    p_init_mixture_probs_pre_softmax = np.random.rand(num_mixtures) * 10
+    # p_init_mixture_probs_pre_softmax = np.random.rand(num_mixtures) / np.e
+    p_init_mixture_probs_pre_softmax = np.log(np.array(list(reversed(temp))))
+    # p_init_mixture_probs_pre_softmax = np.array(list(reversed(2 * np.arange(num_mixtures))))
 
     true_mean_multiplier = 10
-    # init_mean_multiplier = 2
     init_mean_multiplier = true_mean_multiplier
 
-    true_log_stds = np.log(np.array([1 for _ in range(num_mixtures)]))
-    init_log_stds = true_log_stds  # np.log(np.array([10 for _ in range(num_mixtures)]))
-    num_particles = 5
+    true_log_stds = np.log(np.array([5 for _ in range(num_mixtures)]))
+    init_log_stds = true_log_stds
+    num_particles = 2
     num_mc_samples = 10
     num_test_samples = 100
     num_samples = 100
 
-    true_generative_network = GenerativeNetwork(np.log(true_p_mixture_probs), true_mean_multiplier, true_log_stds)
+    true_generative_network = GenerativeNetwork(np.log(true_p_mixture_probs) / softmax_multiplier, true_mean_multiplier, true_log_stds)
     if CUDA:
         true_generative_network.cuda()
     test_x = generate_obs(num_test_samples, true_generative_network)
     true_log_evidence = torch.mean(true_generative_network.log_evidence(test_x)).data[0]
 
-    print('true_log_evidence = {}'.format(true_log_evidence))
-    filename = 'true_log_evidence'
-    np.save(safe_fname(filename, 'npy'), true_log_evidence)
-    print('Saved to {}'.format(filename))
-
-    num_iterations = 30000
-    logging_interval = 1000
-    saving_interval = 1000
-
-    filename = 'num_mixtures'
-    np.save(safe_fname(filename, 'npy'), num_mixtures)
-    print('Saved to {}'.format(filename))
-
-    filename = 'logging_interval'
-    np.save(safe_fname(filename, 'npy'), logging_interval)
-    print('Saved to {}'.format(filename))
-
-    filename = 'num_iterations'
-    np.save(safe_fname(filename, 'npy'), num_iterations)
-    print('Saved to {}'.format(filename))
+    for filename, data in zip(
+        ['num_iterations', 'logging_interval', 'saving_interval', 'num_mixtures', 'true_p_mixture_probs', 'true_mean_multiplier', 'true_log_stds', 'true_log_evidence'],
+        [num_iterations, logging_interval, saving_interval, num_mixtures, true_p_mixture_probs, true_mean_multiplier, true_log_stds, true_log_evidence],
+    ):
+        np.save(safe_fname(filename, 'npy'), data)
+        print('Saved to {}'.format(filename))
 
     # IWAE
 
@@ -653,7 +640,7 @@ def main(args):
             )),
             iwae_filenames
         ):
-            filename = safe_fname('iwae_reinforce_{}'.format(filename), 'npy')
+            filename = safe_fname('iwae_vimco_{}'.format(filename), 'npy')
             np.save(filename, data)
             print('Saved to {}'.format(filename))
 

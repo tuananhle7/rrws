@@ -66,9 +66,9 @@ def main(args):
         axs[1].plot(logging_iterations, iwae_vimco['p_grad_std_history'], linestyle=':', color='black', label='vimco')
         axs[2].plot(logging_iterations, iwae_vimco['q_grad_std_history'], linestyle=':', color='black', label='vimco')
         axs[3].plot(logging_iterations, iwae_vimco['p_mixture_probs_norm_history'], linestyle=':', color='black', label='vimco')
-        axs[4].plot(logging_iterations, iwae_vimco['posterior_norm_history'], linestyle=':', color='black', label='reinforce')
-        axs[5].plot(logging_iterations, iwae_vimco['true_posterior_norm_history'], linestyle=':', color='black', label='reinforce')
-        axs[6].plot(logging_iterations, iwae_vimco['q_grad_mean_history'], linestyle=':', color='black', label='reinforce')
+        axs[4].plot(logging_iterations, iwae_vimco['posterior_norm_history'], linestyle=':', color='black', label='vimco')
+        axs[5].plot(logging_iterations, iwae_vimco['true_posterior_norm_history'], linestyle=':', color='black', label='vimco')
+        axs[6].plot(logging_iterations, iwae_vimco['q_grad_mean_history'], linestyle=':', color='black', label='vimco')
 
     ## RWS
     rws_filenames = ['log_evidence_history', 'posterior_norm_history', 'true_posterior_norm_history', 'p_mixture_probs_norm_history', 'mean_multiplier_history', 'p_grad_std_history', 'q_grad_std_history', 'q_grad_mean_history']
@@ -156,7 +156,11 @@ def main(args):
     axs[3].set_ylabel('L2 of mixture probs.\n to true mixture probs.')
 
     axs[4].set_ylabel('Avg. test L2 of\nq to current p')
+    axs[4].set_ylim(0)
+
     axs[5].set_ylabel('Avg. test L2 of\nq to true p')
+    axs[5].set_ylim(0)
+
     axs[6].set_ylabel('Avg. mean of $\phi$ \n gradient est.')
 
     axs[-1].legend(ncol=4, loc='upper center', bbox_to_anchor=(0.5, -0.4))
