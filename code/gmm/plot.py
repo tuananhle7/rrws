@@ -167,7 +167,7 @@ def main(args):
     axs[-1].set_xlabel('Iteration')
 
     fig.tight_layout()
-    filename = 'gmm.pdf'
+    filename = safe_fname('plot', 'pdf')
     fig.savefig(filename, bbox_inches='tight')
     print('Saved to {}'.format(filename))
 
@@ -182,6 +182,10 @@ def np_load(filename):
 # globals
 SEED = 1
 UID = ''
+
+
+def safe_fname(fname, ext):
+    return '{}_{:d}_{}.{}'.format(fname, SEED, UID, ext)
 
 
 if __name__ == '__main__':

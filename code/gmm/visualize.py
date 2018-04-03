@@ -177,7 +177,7 @@ def main(args):
 
 
     anim = FuncAnimation(fig, update, frames=np.arange(0, num_iterations, saving_interval), blit=True)
-    filename = 'train.mp4'
+    filename = safe_fname('visualize', 'mp4')
     anim.save(filename, dpi=200)
     print('Saved to {}'.format(filename))
 
@@ -190,6 +190,11 @@ def np_load(filename):
 
 SEED = 1
 UID = ''
+
+
+def safe_fname(fname, ext):
+    return '{}_{:d}_{}.{}'.format(fname, SEED, UID, ext)
+
 
 if __name__ == '__main__':
     import argparse
