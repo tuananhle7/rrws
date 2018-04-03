@@ -109,17 +109,31 @@ def logsumexp(values, dim=0, keepdim=False):
     return result if keepdim else result.squeeze(dim)
 
 
-class MixtureDistribution():
+class MixtureDistribution:
     def __init__(self, sample_lambdas, logpdf_lambdas, mixture_probs):
         self.sample_lambdas = sample_lambdas
         self.logpdf_lambdas = logpdf_lambdas
-        self.mixture_probs = mixture_probs
+        self.mixture_probs = Variable(torch.Tensor(mixture_probs))
+        self.num_mixtures = len(mixture_probs)
 
-    def sample(self):
-        pass
+    def sample(self, num_samples):
+        samples = torch.cat(
+            [sample_lambda(num_samples).unsqueeze(1) for sample_lambda in self.sample_lambdas],
+            dim=1
+        )
+        indices = torch.multinomial(
+            self.mixture_probs,
+            num_samples,
+            replacement=True
+        )
+        return torch.gather(samples, dim=1, index=indices.unsqueeze(-1)).squeeze(-1)
 
-    def logpdf(self):
-        pass
+    def logpdf(self, values):
+        logpdfs = torch.cat(
+            [logpdf_lambda(values).unsqueeze(1) for logpdf_lambda in self.logpdf_lambdas],
+            dim=1
+        )
+        return logsumexp(logpdfs + torch.log(self.mixture_probs), dim=1)
 
 
 def generate_obs(num_samples, generative_network):
