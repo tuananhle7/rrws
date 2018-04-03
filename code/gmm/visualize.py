@@ -21,6 +21,7 @@ def visualize_linear_layer(linear_layer, ax):
     ax.set_ylabel('Out')
     return ax
 
+
 def visualize_mlp(mlp):
     linear_layers = list(filter(
         None, [m if isinstance(m, nn.Linear) else False for m in mlp.modules()]
@@ -30,6 +31,7 @@ def visualize_mlp(mlp):
         ax = visualize_linear_layer(linear_layer, ax)
 
     return fig, axs
+
 
 def main(args):
     softmax_multiplier = 0.5
