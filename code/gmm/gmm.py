@@ -11,7 +11,7 @@ iwae_theta_optim = torch.optim.SGD
 iwae_phi_optim = torch.optim.Adam
 iwae_theta_optim_params = {'lr': 1e-1}
 iwae_phi_optim_params = {'lr': 1e-3}
-rws_theta_optim = torch.optim.SGD  # SGD
+rws_theta_optim = torch.optim.SGD
 rws_phi_optim = torch.optim.Adam
 # rws_optim_params = {'lr': 1e-3, 'nesterov': True, 'momentum': 0.7}
 rws_theta_optim_params = {'lr': 1e-1}
@@ -107,6 +107,19 @@ def logsumexp(values, dim=0, keepdim=False):
         torch.exp(values - values_max), dim=dim, keepdim=True
     ))
     return result if keepdim else result.squeeze(dim)
+
+
+class MixtureDistribution():
+    def __init__(self, sample_lambdas, logpdf_lambdas, mixture_probs):
+        self.sample_lambdas = sample_lambdas
+        self.logpdf_lambdas = logpdf_lambdas
+        self.mixture_probs = mixture_probs
+
+    def sample(self):
+        pass
+
+    def logpdf(self):
+        pass
 
 
 def generate_obs(num_samples, generative_network):
@@ -579,9 +592,8 @@ def main(args):
 
     temp = np.arange(num_mixtures) + 5
     true_p_mixture_probs = temp / np.sum(temp)
-    # p_init_mixture_probs_pre_softmax = np.random.rand(num_mixtures) / np.e
-    p_init_mixture_probs_pre_softmax = np.log(np.array(list(reversed(temp))))
-    # p_init_mixture_probs_pre_softmax = np.array(list(reversed(2 * np.arange(num_mixtures))))
+    # p_init_mixture_probs_pre_softmax = np.log(np.array(list(reversed(temp)))) # near
+    p_init_mixture_probs_pre_softmax = np.array(list(reversed(2 * np.arange(num_mixtures)))) # far
 
     true_mean_multiplier = 10
     init_mean_multiplier = true_mean_multiplier
