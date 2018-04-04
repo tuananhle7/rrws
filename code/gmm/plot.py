@@ -91,21 +91,22 @@ def main(args):
         axs[6].plot(logging_iterations, ws['q_grad_mean_history'], linestyle='-.',color='0.5', label='ws')
 
     if args.all or args.ww:
-        ww = dict(zip(
-            rws_filenames,
-            map(
-                lambda rws_filename: np_load('ww_{}'.format(rws_filename)),
-                rws_filenames
-            )
-        ))
-
-        axs[0].plot(logging_iterations, ww['log_evidence_history'], linestyle='--',color='0.8', label='ww')
-        axs[1].plot(logging_iterations, ww['p_grad_std_history'], linestyle='--',color='0.8', label='ww')
-        axs[2].plot(logging_iterations, ww['q_grad_std_history'], linestyle='--',color='0.8', label='ww')
-        axs[3].plot(logging_iterations, ww['p_mixture_probs_norm_history'], linestyle='--',color='0.8', label='ww')
-        axs[4].plot(logging_iterations, ww['posterior_norm_history'], linestyle='--',color='0.8', label='ww')
-        axs[5].plot(logging_iterations, ww['true_posterior_norm_history'], linestyle='--',color='0.8', label='ww')
-        axs[6].plot(logging_iterations, ww['q_grad_mean_history'], linestyle='--',color='0.8', label='ww')
+        for q_mixture_prob in args.ww_probs:
+            ww = dict(zip(
+                rws_filenames,
+                map(
+                    lambda rws_filename: np_load('ww_{}_{}'.format(str(q_mixture_prob).replace('.', '-'), rws_filename)),
+                    rws_filenames
+                )
+            ))
+            q_mixture_prob_color = str(q_mixture_prob * 0.9)
+            axs[0].plot(logging_iterations, ww['log_evidence_history'], linestyle='--', color=q_mixture_prob_color, label='ww {}'.format(q_mixture_prob))
+            axs[1].plot(logging_iterations, ww['p_grad_std_history'], linestyle='--', color=q_mixture_prob_color, label='ww {}'.format(q_mixture_prob))
+            axs[2].plot(logging_iterations, ww['q_grad_std_history'], linestyle='--', color=q_mixture_prob_color, label='ww {}'.format(q_mixture_prob))
+            axs[3].plot(logging_iterations, ww['p_mixture_probs_norm_history'], linestyle='--', color=q_mixture_prob_color, label='ww {}'.format(q_mixture_prob))
+            axs[4].plot(logging_iterations, ww['posterior_norm_history'], linestyle='--', color=q_mixture_prob_color, label='ww {}'.format(q_mixture_prob))
+            axs[5].plot(logging_iterations, ww['true_posterior_norm_history'], linestyle='--', color=q_mixture_prob_color, label='ww {}'.format(q_mixture_prob))
+            axs[6].plot(logging_iterations, ww['q_grad_mean_history'], linestyle='--', color=q_mixture_prob_color, label='ww {}'.format(q_mixture_prob))
 
     if args.all or args.wsw:
         wsw = dict(zip(
@@ -201,6 +202,7 @@ if __name__ == '__main__':
     parser.add_argument('--vimco', action='store_true', default=False)
     parser.add_argument('--ws', action='store_true', default=False)
     parser.add_argument('--ww', action='store_true', default=False)
+    parser.add_argument('--ww-probs', nargs='*', type=float, default=[1.0])
     parser.add_argument('--wsw', action='store_true', default=False)
     parser.add_argument('--wswa', action='store_true', default=False)
     args = parser.parse_args()

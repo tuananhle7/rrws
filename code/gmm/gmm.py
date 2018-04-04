@@ -7,14 +7,14 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-iwae_theta_optim = torch.optim.SGD
+iwae_theta_optim = torch.optim.Adam
 iwae_phi_optim = torch.optim.Adam
-iwae_theta_optim_params = {'lr': 1e-1}
+iwae_theta_optim_params = {'lr': 1e-3}
 iwae_phi_optim_params = {'lr': 1e-3}
-rws_theta_optim = torch.optim.SGD
+rws_theta_optim = torch.optim.Adam
 rws_phi_optim = torch.optim.Adam
 # rws_optim_params = {'lr': 1e-3, 'nesterov': True, 'momentum': 0.7}
-rws_theta_optim_params = {'lr': 1e-1}
+rws_theta_optim_params = {'lr': 1e-3}
 rws_phi_optim_params = {'lr': 1e-3}
 softmax_multiplier = 0.5
 
@@ -435,24 +435,41 @@ class RWS(nn.Module):
         z, x = self.generative_network.sample(num_samples)
         return -self.inference_network.logpdf(z.detach(), x.detach())
 
-    def wake_phi(self, x, num_particles=1):
+    def wake_phi(self, x, num_particles=1, q_mixture_prob=1):
+        num_samples = len(x)
         x_expanded = x.unsqueeze(-1).expand(-1, num_particles)
         x_expanded_flattened = x_expanded.contiguous().view(-1)
-        z_expanded_flattened = self.inference_network.sample(x_expanded_flattened)
+        # z_expanded_flattened = self.inference_network.sample(x_expanded_flattened)
+        mixture_distribution = MixtureDistribution(
+            [
+                lambda _: self.inference_network.sample(x_expanded_flattened),
+                lambda _: Variable(torch.multinomial(torch.ones(self.num_mixtures), num_particles * num_samples, replacement=True))
+                # lambda _: self.generative_network.sample_z(num_particles * num_samples)
+            ],
+            [
+                lambda values: self.inference_network.logpdf(values, x_expanded_flattened),
+                lambda values: Variable(-torch.log(torch.Tensor([self.num_mixtures])).expand(num_particles * num_samples))
+                # lambda values: self.generative_network.z_logpdf(values)
+            ],
+            [q_mixture_prob, 1 - q_mixture_prob]
+        )
+        z_expanded_flattened = mixture_distribution.sample(num_particles * num_samples)
+        log_q_mixture = mixture_distribution.logpdf(z_expanded_flattened).view(-1, num_particles)
         log_p = self.generative_network.logpdf(z_expanded_flattened, x_expanded_flattened).view(-1, num_particles)
         log_p_true = 0 if self.true_generative_network is None else self.true_generative_network.log_evidence(x_expanded_flattened).view(-1, num_particles)
         log_q = self.inference_network.logpdf(z_expanded_flattened, x_expanded_flattened).view(-1, num_particles)
-        log_weight = log_p - log_q - log_p_true
+        # log_weight = log_p - log_q - log_p_true
+        log_weight = log_p - log_q_mixture - log_p_true
         normalized_weight = torch.exp(lognormexp(log_weight, dim=1))
         return -torch.sum(normalized_weight.detach() * log_q, dim=1)
 
-    def forward(self, mode, x=None, num_particles=None, num_samples=None):
+    def forward(self, mode, x=None, num_particles=None, num_samples=None, q_mixture_prob=1):
         if mode == 'wake_theta':
             return torch.mean(self.wake_theta(x, num_particles))
         elif mode == 'sleep_phi':
             return torch.mean(self.sleep_phi(num_samples))
         elif mode == 'wake_phi':
-            return torch.mean(self.wake_phi(x, num_particles))
+            return torch.mean(self.wake_phi(x, num_particles, q_mixture_prob=q_mixture_prob))
         else:
             raise NotImplementedError()
 
@@ -462,7 +479,7 @@ def train_rws(
     true_p_mixture_probs, true_mean_multiplier, true_log_stds, test_x,
     mode,
     num_iterations, num_samples, num_particles, num_mc_samples,
-    logging_interval, saving_interval
+    logging_interval, saving_interval, q_mixture_prob=1
 ):
     log_evidence_history = []
     posterior_norm_history = []
@@ -501,18 +518,18 @@ def train_rws(
             phi_optimizer.step()
         elif mode == 'ww':
             phi_optimizer.zero_grad()
-            loss = rws('wake_phi', x=x, num_particles=num_particles)
+            loss = rws('wake_phi', x=x, num_particles=num_particles, q_mixture_prob=q_mixture_prob)
             loss.backward()
             phi_optimizer.step()
         elif mode == 'wsw':
             phi_optimizer.zero_grad()
-            loss = 0.5 * rws('sleep_phi', num_samples=num_samples) + 0.5 * rws('wake_phi', x=x, num_particles=num_particles)
+            loss = 0.5 * rws('sleep_phi', num_samples=num_samples) + 0.5 * rws('wake_phi', x=x, num_particles=num_particles, q_mixture_prob=q_mixture_prob)
             loss.backward()
             phi_optimizer.step()
         elif mode == 'wswa':
             phi_optimizer.zero_grad()
             s_loss = rws('sleep_phi', num_samples=num_samples)
-            w_loss = rws('wake_phi', x=x, num_particles=num_particles)
+            w_loss = rws('wake_phi', x=x, num_particles=num_particles, q_mixture_prob=q_mixture_prob)
             d = torch.abs(s_loss - w_loss)
             alpha = 1 - d.neg().exp().data[0]
             loss = alpha * w_loss + (1 - alpha) * s_loss
@@ -522,7 +539,10 @@ def train_rws(
             raise AttributeError('Mode must be one of ws, ww, wsw. Got: {}'.format(mode))
 
         if i % saving_interval == 0:
-            filename = safe_fname('{}_{}'.format(mode, i), 'pt')
+            if mode == 'ww':
+                filename = safe_fname('{}{}_{}'.format(mode, str(q_mixture_prob).replace('.', '-'), i), 'pt')
+            else:
+                filename = safe_fname('{}_{}'.format(mode, i), 'pt')
             torch.save(
                 OrderedDict((name, tensor.cpu()) for name, tensor in rws.state_dict().items()),
                 filename
@@ -598,7 +618,7 @@ def train_rws(
 
 
 def main(args):
-    num_iterations = 10000
+    num_iterations = 20000
     logging_interval = 100
     saving_interval = 100
 
@@ -695,19 +715,24 @@ def main(args):
     ## WW
     if args.all or args.ww:
         mode = 'ww'
-        for [data, filename] in zip(
-            list(train_rws(
-                p_init_mixture_probs_pre_softmax, init_mean_multiplier, init_log_stds,
-                true_p_mixture_probs, true_mean_multiplier, true_log_stds, test_x,
-                mode,
-                num_iterations, num_samples, num_particles, num_mc_samples,
-                logging_interval, saving_interval
-            )),
-            rws_filenames
-        ):
-            filename = safe_fname('{}_{}'.format(mode, filename), 'npy')
-            np.save(filename, data)
-            print('Saved to {}'.format(filename))
+        for q_mixture_prob in args.ww_probs:
+            for [data, filename] in zip(
+                list(train_rws(
+                    p_init_mixture_probs_pre_softmax, init_mean_multiplier, init_log_stds,
+                    true_p_mixture_probs, true_mean_multiplier, true_log_stds, test_x,
+                    mode,
+                    num_iterations, num_samples, num_particles, num_mc_samples,
+                    logging_interval, saving_interval, q_mixture_prob
+                )),
+                rws_filenames
+            ):
+                filename = safe_fname('{}_{}_{}'.format(
+                    mode,
+                    str(q_mixture_prob).replace('.', '-'),
+                    filename
+                ), 'npy')
+                np.save(filename, data)
+                print('Saved to {}'.format(filename))
 
     ## WSW
     if args.all or args.wsw:
@@ -775,6 +800,7 @@ if __name__ == '__main__':
     parser.add_argument('--vimco', action='store_true', default=False)
     parser.add_argument('--ws', action='store_true', default=False)
     parser.add_argument('--ww', action='store_true', default=False)
+    parser.add_argument('--ww-probs', nargs='*', type=float, default=[1.0])
     parser.add_argument('--wsw', action='store_true', default=False)
     parser.add_argument('--wswa', action='store_true', default=False)
     args = parser.parse_args()
