@@ -225,9 +225,9 @@ class InferenceNetwork(nn.Module):
         self.num_mixtures = num_mixtures
         self.mlp = nn.Sequential(
             nn.Linear(1, 16),
-            nn.Sigmoid(),
+            nn.Tanh(),
             nn.Linear(16, 16),
-            nn.Sigmoid(),
+            nn.Tanh(),
             nn.Linear(16, self.num_mixtures),
             nn.Softmax(dim=1)
         )
@@ -618,7 +618,7 @@ def train_rws(
 
 
 def main(args):
-    num_iterations = 20000
+    num_iterations = 10000
     logging_interval = 100
     saving_interval = 100
 

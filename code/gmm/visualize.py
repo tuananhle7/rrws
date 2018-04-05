@@ -78,8 +78,6 @@ def main(args):
         for ax_idx, ax in enumerate(axs[1]):
             x = Variable(torch.Tensor([true_mean_multiplier * ax_idx]))
             q_iwae_lines[ax_idx], = ax.plot(np.arange(num_mixtures), iwae_vimco.inference_network.get_z_params(x).data.numpy()[0], label='vimco', marker='v')
-    else:
-        q_iwae_lines = []
 
     if args.ww or args.all:
         q_ww_lines = [None] * (len(args.ww_probs) * num_mixtures)
@@ -94,8 +92,6 @@ def main(args):
             for ax_idx, ax in enumerate(axs[1]):
                 x = Variable(torch.Tensor([true_mean_multiplier * ax_idx]))
                 q_ww_lines[q_mixture_prob_idx * num_mixtures + ax_idx], = ax.plot(np.arange(num_mixtures), ww.inference_network.get_z_params(x).data.numpy()[0], label='ww {}'.format(q_mixture_prob), marker='o', color=q_mixture_prob_color)
-    else:
-        q_ww_lines = []
 
     if args.ws or args.all:
         q_ws_lines = [None] * num_mixtures
@@ -107,8 +103,6 @@ def main(args):
         for ax_idx, ax in enumerate(axs[1]):
             x = Variable(torch.Tensor([true_mean_multiplier * ax_idx]))
             q_ws_lines[ax_idx], = ax.plot(np.arange(num_mixtures), ws.inference_network.get_z_params(x).data.numpy()[0], label='ws', marker='^')
-    else:
-        q_ws_lines = []
 
     axs[0, 0].legend(loc='center left', bbox_to_anchor=(1, 0.5))
     axs[0, 0].set_ylabel('$p_{\\theta}(z)$')
@@ -126,6 +120,7 @@ def main(args):
         iteration = frame
 
         t.set_text('Iteration {}'.format(iteration))
+        result = [t]
 
         if args.vimco or args.all:
             filename = 'vimco_{}_{}_{}.pt'.format(iteration, SEED, UID)
@@ -136,6 +131,7 @@ def main(args):
             for ax_idx in range(num_mixtures):
                 x = Variable(torch.Tensor([true_mean_multiplier * ax_idx]))
                 q_iwae_lines[ax_idx].set_data(np.arange(num_mixtures), iwae_vimco.inference_network.get_z_params(x).data.numpy()[0])
+            result = result + [p_iwae] + q_iwae_lines
 
         if args.ww or args.all:
             for q_mixture_prob_idx, q_mixture_prob in enumerate(args.ww_probs):
@@ -147,6 +143,7 @@ def main(args):
                 for ax_idx in range(num_mixtures):
                     x = Variable(torch.Tensor([true_mean_multiplier * ax_idx]))
                     q_ww_lines[q_mixture_prob_idx * num_mixtures + ax_idx].set_data(np.arange(num_mixtures), ww.inference_network.get_z_params(x).data.numpy()[0])
+            result = result + p_ww_lines + q_ww_lines
 
         if args.ws or args.all:
             filename = 'ws_{}_{}_{}.pt'.format(iteration, SEED, UID)
@@ -157,8 +154,9 @@ def main(args):
             for ax_idx in range(num_mixtures):
                 x = Variable(torch.Tensor([true_mean_multiplier * ax_idx]))
                 q_ws_lines[ax_idx].set_data(np.arange(num_mixtures), ws.inference_network.get_z_params(x).data.numpy()[0])
+            result = result + [p_ws] + q_ws_lines
 
-        return [t, p_iwae, p_ws] + p_ww_lines + q_iwae_lines + q_ww_lines + q_ws_lines
+        return result
 
     anim = FuncAnimation(fig, update, frames=np.arange(0, num_iterations, saving_interval), blit=True)
     filename = safe_fname('visualize', 'mp4')
