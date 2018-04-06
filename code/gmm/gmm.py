@@ -262,26 +262,26 @@ class InferenceNetwork(nn.Module):
         return self.z_logpdf(z, x)
 
 
-class RelaxControlVariate(nn.Module):
-    def __init__(self):
-        super(RelaxControlVariate, self).__init__()
-        self.control_variate_z = nn.Sequential(
-            nn.Linear(2, 16),
-            nn.Tanh(),
-            nn.Linear(16, 16),
-            nn.Tanh(),
-            nn.Linear(16, 1),
-            nn.ReLU()
-        )
-
-    def forward(self, aux_z, aux_z_tilde, x):
-        c_z = self.control_variate_z(
-            torch.cat([x.unsqueeze(-1), aux_z.unsqueeze(-1)], dim=1)
-        ).squeeze(-1)
-        c_z_tilde = self.control_variate_z(
-            torch.cat([x.unsqueeze(-1), aux_z_tilde.unsqueeze(-1)], dim=1)
-        ).squeeze(-1)
-        return c_z, c_z_tilde
+# class RelaxControlVariate(nn.Module):
+#     def __init__(self):
+#         super(RelaxControlVariate, self).__init__()
+#         self.control_variate_z = nn.Sequential(
+#             nn.Linear(2, 16),
+#             nn.Tanh(),
+#             nn.Linear(16, 16),
+#             nn.Tanh(),
+#             nn.Linear(16, 1),
+#             nn.ReLU()
+#         )
+#
+#     def forward(self, aux_z, aux_z_tilde, x):
+#         c_z = self.control_variate_z(
+#             torch.cat([x.unsqueeze(-1), aux_z.unsqueeze(-1)], dim=1)
+#         ).squeeze(-1)
+#         c_z_tilde = self.control_variate_z(
+#             torch.cat([x.unsqueeze(-1), aux_z_tilde.unsqueeze(-1)], dim=1)
+#         ).squeeze(-1)
+#         return c_z, c_z_tilde
 
 
 class IWAE(nn.Module):
