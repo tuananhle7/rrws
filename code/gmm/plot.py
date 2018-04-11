@@ -3,6 +3,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import os
 
+from util import *
+
 SMALL_SIZE = 7
 MEDIUM_SIZE = 9
 BIGGER_SIZE = 11
@@ -15,14 +17,14 @@ plt.rc('xtick', labelsize=SMALL_SIZE)    # fontsize of the tick labels
 plt.rc('ytick', labelsize=SMALL_SIZE)    # fontsize of the tick labels
 plt.rc('legend', fontsize=SMALL_SIZE)    # legend fontsize
 plt.rc('figure', titlesize=BIGGER_SIZE)  # fontsize of the figure title
-plt.rc('lines', linewidth=0.8)           # line thickness
+plt.rc('lines', linewidth=0.5)           # line thickness
 
 
 def main(args):
-    true_log_evidence = np_load('true_log_evidence.npy')
-    num_mixtures = np_load('num_mixtures.npy')
-    num_iterations = np_load('num_iterations.npy')
-    logging_interval = np_load('logging_interval.npy')
+    true_log_evidence = np.load('{}/true_log_evidence_{}.npy'.format(WORKING_DIR, args.uid))
+    num_mixtures = np.load('{}/num_mixtures_{}.npy'.format(WORKING_DIR, args.uid))
+    num_iterations = np.load('{}/num_iterations_{}.npy'.format(WORKING_DIR, args.uid))
+    logging_interval = np.load('{}/logging_interval_{}.npy'.format(WORKING_DIR, args.uid))
     logging_iterations = np.arange(0, num_iterations, logging_interval)
 
     # Plotting
@@ -34,113 +36,77 @@ def main(args):
         ax.spines['right'].set_visible(False)
 
     ## IWAE
-    iwae_filenames = ['log_evidence_history', 'elbo_history', 'posterior_norm_history', 'true_posterior_norm_history', 'p_mixture_probs_norm_history', 'mean_multiplier_history', 'p_grad_std_history', 'q_grad_std_history', 'q_grad_mean_history']
-
+    iwae_filenames = ['log_evidence_history', 'p_mixture_probs_norm_history', 'posterior_norm_history', 'true_posterior_norm_history', 'p_grad_std_history', 'q_grad_std_history', 'q_grad_mean_history']
     if args.all or args.reinforce:
-        iwae_reinforce = dict(zip(
-            iwae_filenames,
-            map(
-                lambda iwae_filename: np_load('iwae_reinforce_{}'.format(iwae_filename)),
-                iwae_filenames
-            )
-        ))
+        iwae_reinforce = read_files('iwae_reinforce', iwae_filenames, args.seeds, args.uid)
+        kwargs = {'linestyle': '-', 'label': 'reinforce'}
 
-        axs[0].plot(logging_iterations, np.abs(true_log_evidence - iwae_reinforce['log_evidence_history']), linestyle=':', color='0.5', label='reinforce')
-        axs[1].plot(logging_iterations, iwae_reinforce['p_mixture_probs_norm_history'], linestyle=':', color='0.5', label='reinforce')
-        axs[2].plot(logging_iterations, iwae_reinforce['posterior_norm_history'], linestyle=':', color='0.5', label='reinforce')
-        axs[3].plot(logging_iterations, iwae_reinforce['true_posterior_norm_history'], linestyle=':', color='0.5', label='reinforce')
-        axs[4].plot(logging_iterations, iwae_reinforce['p_grad_std_history'], linestyle=':', color='0.5', label='reinforce')
-        axs[5].plot(logging_iterations, iwae_reinforce['q_grad_std_history'], linestyle=':', color='0.5', label='reinforce')
-        axs[6].plot(logging_iterations, iwae_reinforce['q_grad_mean_history'], linestyle=':', color='0.5', label='reinforce')
+        for idx, filename in enumerate(iwae_filenames):
+            if filename == 'log_evidence_history':
+                data = np.abs(true_log_evidence - iwae_reinforce[filename])
+            else:
+                data = iwae_reinforce[filename]
+            plot_with_error_bars(logging_iterations, data, axs[idx], **kwargs)
 
     if args.all or args.vimco:
-        iwae_vimco = dict(zip(
-            iwae_filenames,
-            map(
-                lambda iwae_filename: np_load('iwae_vimco_{}'.format(iwae_filename)),
-                iwae_filenames
-            )
-        ))
+        iwae_vimco = read_files('iwae_vimco', iwae_filenames, args.seeds, args.uid)
+        kwargs = {'linestyle': '-', 'label': 'vimco'}
 
-        axs[0].plot(logging_iterations, np.abs(true_log_evidence - iwae_vimco['log_evidence_history']), linestyle=':', color='black', label='vimco')
-        axs[1].plot(logging_iterations, iwae_vimco['p_mixture_probs_norm_history'], linestyle=':', color='black', label='vimco')
-        axs[2].plot(logging_iterations, iwae_vimco['posterior_norm_history'], linestyle=':', color='black', label='vimco')
-        axs[3].plot(logging_iterations, iwae_vimco['true_posterior_norm_history'], linestyle=':', color='black', label='vimco')
-        axs[4].plot(logging_iterations, iwae_vimco['p_grad_std_history'], linestyle=':', color='black', label='vimco')
-        axs[5].plot(logging_iterations, iwae_vimco['q_grad_std_history'], linestyle=':', color='black', label='vimco')
-        axs[6].plot(logging_iterations, iwae_vimco['q_grad_mean_history'], linestyle=':', color='black', label='vimco')
+        for idx, filename in enumerate(iwae_filenames):
+            if filename == 'log_evidence_history':
+                data = np.abs(true_log_evidence - iwae_vimco[filename])
+            else:
+                data = iwae_vimco[filename]
+            plot_with_error_bars(logging_iterations, data, axs[idx], **kwargs)
+
 
     ## RWS
-    rws_filenames = ['log_evidence_history', 'posterior_norm_history', 'true_posterior_norm_history', 'p_mixture_probs_norm_history', 'mean_multiplier_history', 'p_grad_std_history', 'q_grad_std_history', 'q_grad_mean_history']
+    rws_filenames = ['log_evidence_history', 'p_mixture_probs_norm_history', 'posterior_norm_history', 'true_posterior_norm_history', 'p_grad_std_history', 'q_grad_std_history', 'q_grad_mean_history']
 
     if args.all or args.ws:
-        ws = dict(zip(
-            rws_filenames,
-            map(
-                lambda rws_filename: np_load('ws_{}'.format(rws_filename)),
-                rws_filenames
-            )
-        ))
+        ws = read_files('ws', rws_filenames , args.seeds, args.uid)
+        kwargs = {'linestyle': '-', 'label': 'ws'}
 
-        axs[0].plot(logging_iterations, np.abs(true_log_evidence - ws['log_evidence_history']), linestyle='-.',color='0.5', label='ws')
-        axs[1].plot(logging_iterations, ws['p_mixture_probs_norm_history'], linestyle='-.',color='0.5', label='ws')
-        axs[2].plot(logging_iterations, ws['posterior_norm_history'], linestyle='-.',color='0.5', label='ws')
-        axs[3].plot(logging_iterations, ws['true_posterior_norm_history'], linestyle='-.',color='0.5', label='ws')
-        axs[4].plot(logging_iterations, ws['p_grad_std_history'], linestyle='-.',color='0.5', label='ws')
-        axs[5].plot(logging_iterations, ws['q_grad_std_history'], linestyle='-.',color='0.5', label='ws')
-        axs[6].plot(logging_iterations, ws['q_grad_mean_history'], linestyle='-.',color='0.5', label='ws')
+        for idx, filename in enumerate(iwae_filenames):
+            if filename == 'log_evidence_history':
+                data = np.abs(true_log_evidence - ws[filename])
+            else:
+                data = ws[filename]
+            plot_with_error_bars(logging_iterations, data, axs[idx], **kwargs)
 
     if args.all or args.ww:
         for q_mixture_prob in args.ww_probs:
-            ww = dict(zip(
-                rws_filenames,
-                map(
-                    lambda rws_filename: np_load('ww_{}_{}'.format(str(q_mixture_prob).replace('.', '-'), rws_filename)),
-                    rws_filenames
-                )
-            ))
-            q_mixture_prob_color = str(q_mixture_prob * 0.9)
-            axs[0].plot(logging_iterations, np.abs(true_log_evidence - ww['log_evidence_history']), linestyle='--', color=q_mixture_prob_color, label='ww {}'.format(q_mixture_prob))
-            axs[1].plot(logging_iterations, ww['p_mixture_probs_norm_history'], linestyle='--', color=q_mixture_prob_color, label='ww {}'.format(q_mixture_prob))
-            axs[2].plot(logging_iterations, ww['posterior_norm_history'], linestyle='--', color=q_mixture_prob_color, label='ww {}'.format(q_mixture_prob))
-            axs[3].plot(logging_iterations, ww['true_posterior_norm_history'], linestyle='--', color=q_mixture_prob_color, label='ww {}'.format(q_mixture_prob))
-            axs[4].plot(logging_iterations, ww['p_grad_std_history'], linestyle='--', color=q_mixture_prob_color, label='ww {}'.format(q_mixture_prob))
-            axs[5].plot(logging_iterations, ww['q_grad_std_history'], linestyle='--', color=q_mixture_prob_color, label='ww {}'.format(q_mixture_prob))
-            axs[6].plot(logging_iterations, ww['q_grad_mean_history'], linestyle='--', color=q_mixture_prob_color, label='ww {}'.format(q_mixture_prob))
+            ww = read_files('ww_{}'.format(str(q_mixture_prob).replace('.', '-')), rws_filenames, args.seeds, args.uid)
+            kwargs = {'linestyle': '-', 'label': 'ww {}'.format(q_mixture_prob)}
+
+            for idx, filename in enumerate(iwae_filenames):
+                if filename == 'log_evidence_history':
+                    data = np.abs(true_log_evidence - ww[filename])
+                else:
+                    data = ww[filename]
+                plot_with_error_bars(logging_iterations, data, axs[idx], **kwargs)
 
     if args.all or args.wsw:
-        wsw = dict(zip(
-            rws_filenames,
-            map(
-                lambda rws_filename: np_load('wsw_{}'.format(rws_filename)),
-                rws_filenames
-            )
-        ))
+        wsw = read_files('wsw', rws_filenames , args.seeds, args.uid)
+        kwargs = {'linestyle': '-', 'label': 'wsw'}
 
-        axs[0].plot(logging_iterations, np.abs(true_log_evidence - wsw['log_evidence_history']), linestyle='--',color='0.5', label='wsw')
-        axs[1].plot(logging_iterations, wsw['p_mixture_probs_norm_history'], linestyle='--',color='0.5', label='wsw')
-        axs[2].plot(logging_iterations, wsw['posterior_norm_history'], linestyle='--',color='0.5', label='wsw')
-        axs[3].plot(logging_iterations, wsw['true_posterior_norm_history'], linestyle='--',color='0.5', label='wsw')
-        axs[4].plot(logging_iterations, wsw['p_grad_std_history'], linestyle='--',color='0.5', label='wsw')
-        axs[5].plot(logging_iterations, wsw['q_grad_std_history'], linestyle='--',color='0.5', label='wsw')
-        axs[6].plot(logging_iterations, wsw['q_grad_mean_history'], linestyle='--',color='0.5', label='wsw')
+        for idx, filename in enumerate(iwae_filenames):
+            if filename == 'log_evidence_history':
+                data = np.abs(true_log_evidence - wsw[filename])
+            else:
+                data = wsw[filename]
+            plot_with_error_bars(logging_iterations, data, axs[idx], **kwargs)
 
     if args.all or args.wswa:
-        wswa = dict(zip(
-            rws_filenames,
-            map(
-                lambda rws_filename: np_load('wswa_{}'.format(rws_filename)),
-                rws_filenames
-            )
-        ))
+        wswa = read_files('wswa', rws_filenames , args.seeds, args.uid)
+        kwargs = {'linestyle': '-', 'label': 'wswa'}
 
-        axs[0].plot(logging_iterations, np.abs(true_log_evidence - wswa['log_evidence_history']), linestyle='-',color='0.5', label='wswa')
-        axs[1].plot(logging_iterations, wswa['p_mixture_probs_norm_history'], linestyle='-',color='0.5', label='wswa')
-        axs[2].plot(logging_iterations, wswa['posterior_norm_history'], linestyle='-',color='0.5', label='wswa')
-        axs[3].plot(logging_iterations, wswa['true_posterior_norm_history'], linestyle='-',color='0.5', label='wswa')
-        axs[4].plot(logging_iterations, wswa['p_grad_std_history'], linestyle='-',color='0.5', label='wswa')
-        axs[5].plot(logging_iterations, wswa['q_grad_std_history'], linestyle='-',color='0.5', label='wswa')
-        axs[6].plot(logging_iterations, wswa['q_grad_mean_history'], linestyle='-',color='0.5', label='wswa')
+        for idx, filename in enumerate(iwae_filenames):
+            if filename == 'log_evidence_history':
+                data = np.abs(true_log_evidence - wswa[filename])
+            else:
+                data = wswa[filename]
+            plot_with_error_bars(logging_iterations, data, axs[idx], **kwargs)
 
     # axs[0].axhline(true_log_evidence, linestyle='-', color='black', label='true')
     # axs[0].set_ylabel('Avg. test\nlog evidence')
@@ -173,25 +139,32 @@ def main(args):
     axs[-1].set_xlabel('Iteration')
 
     fig.tight_layout()
-    filename = safe_fname('plot', 'pdf')
+    filename = '{}/plot_{}.pdf'.format(OUTPUT_DIR, args.uid)
     fig.savefig(filename, bbox_inches='tight')
     print('Saved to {}'.format(filename))
 
 
-def np_load(filename):
-    return np.load('{}_{:d}_{}.npy'.format(
-        os.path.splitext(filename)[0], SEED, UID
-    ))
+def read_files(algorithm, filenames, seeds, uid):
+    num_seeds = len(seeds)
+    temp = np.load('{}/{}_{}_{}_{}.npy'.format(WORKING_DIR, algorithm, filenames[0], seeds[0], uid))
+    num_data = len(temp)
+    result = {}
+    for filename in filenames:
+        result[filename] = np.zeros([num_seeds, num_data])
+        for seed_idx, seed in enumerate(seeds):
+            result[filename][seed_idx] = np.load('{}/{}_{}_{}_{}.npy'.format(
+                WORKING_DIR, algorithm, filename, seed, uid
+            ))
+    return result
 
 
-# os.path.splitext(filename)[0]
-# globals
-SEED = 1
-UID = ''
-
-
-def safe_fname(fname, ext):
-    return '{}_{:d}_{}.{}'.format(fname, SEED, UID, ext)
+def plot_with_error_bars(x, ys, ax, *args, **kwargs):
+    median = np.median(ys, axis=0)
+    first_quartile = np.percentile(ys, 25, axis=0)
+    third_quartile = np.percentile(ys, 75, axis=0)
+    line = ax.plot(x, median, *args, **kwargs)
+    ax.fill_between(x, y1=first_quartile, y2=third_quartile, alpha=0.2, color=line[0].get_color())
+    return ax
 
 
 if __name__ == '__main__':
@@ -200,8 +173,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='GMM open universe')
     parser.add_argument('--uid', type=str, default='', metavar='U',
                         help='run UID')
-    parser.add_argument('--seed', type=int, default=1, metavar='S',
-                        help='run seed')
+    parser.add_argument('--seeds', nargs='*', type=int, default=[1])
     parser.add_argument('--all', action='store_true', default=False)
     parser.add_argument('--reinforce', action='store_true', default=False)
     parser.add_argument('--vimco', action='store_true', default=False)
@@ -211,7 +183,5 @@ if __name__ == '__main__':
     parser.add_argument('--wsw', action='store_true', default=False)
     parser.add_argument('--wswa', action='store_true', default=False)
     args = parser.parse_args()
-    SEED = args.seed
-    UID = args.uid
 
     main(args)
