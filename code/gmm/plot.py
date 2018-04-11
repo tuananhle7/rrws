@@ -28,51 +28,38 @@ def main(args):
     logging_iterations = np.arange(0, num_iterations, logging_interval)
 
     # Plotting
-    fig, axs = plt.subplots(7, 1, sharex=True)
-    fig.set_size_inches(3.25, 8)
+    fig, axs = plt.subplots(4, 1, sharex=True)
+    fig.set_size_inches(3.25, 5)
 
     for ax in axs:
         ax.spines['top'].set_visible(False)
         ax.spines['right'].set_visible(False)
 
     ## IWAE
-    iwae_filenames = ['log_evidence_history', 'p_mixture_probs_norm_history', 'posterior_norm_history', 'true_posterior_norm_history', 'p_grad_std_history', 'q_grad_std_history', 'q_grad_mean_history']
+    iwae_filenames = ['p_mixture_probs_norm_history', 'posterior_norm_history', 'true_posterior_norm_history', 'q_grad_std_history']
     if args.all or args.reinforce:
         iwae_reinforce = read_files('iwae_reinforce', iwae_filenames, args.seeds, args.uid)
         kwargs = {'linestyle': '-', 'label': 'reinforce'}
 
         for idx, filename in enumerate(iwae_filenames):
-            if filename == 'log_evidence_history':
-                data = np.abs(true_log_evidence - iwae_reinforce[filename])
-            else:
-                data = iwae_reinforce[filename]
-            plot_with_error_bars(logging_iterations, data, axs[idx], **kwargs)
+            plot_with_error_bars(logging_iterations, iwae_reinforce[filename], axs[idx], **kwargs)
 
     if args.all or args.vimco:
         iwae_vimco = read_files('iwae_vimco', iwae_filenames, args.seeds, args.uid)
         kwargs = {'linestyle': '-', 'label': 'vimco'}
 
         for idx, filename in enumerate(iwae_filenames):
-            if filename == 'log_evidence_history':
-                data = np.abs(true_log_evidence - iwae_vimco[filename])
-            else:
-                data = iwae_vimco[filename]
-            plot_with_error_bars(logging_iterations, data, axs[idx], **kwargs)
-
+            plot_with_error_bars(logging_iterations, iwae_vimco[filename], axs[idx], **kwargs)
 
     ## RWS
-    rws_filenames = ['log_evidence_history', 'p_mixture_probs_norm_history', 'posterior_norm_history', 'true_posterior_norm_history', 'p_grad_std_history', 'q_grad_std_history', 'q_grad_mean_history']
+    rws_filenames = ['p_mixture_probs_norm_history', 'posterior_norm_history', 'true_posterior_norm_history', 'q_grad_std_history']
 
     if args.all or args.ws:
         ws = read_files('ws', rws_filenames , args.seeds, args.uid)
         kwargs = {'linestyle': '-', 'label': 'ws'}
 
         for idx, filename in enumerate(iwae_filenames):
-            if filename == 'log_evidence_history':
-                data = np.abs(true_log_evidence - ws[filename])
-            else:
-                data = ws[filename]
-            plot_with_error_bars(logging_iterations, data, axs[idx], **kwargs)
+            plot_with_error_bars(logging_iterations, ws[filename], axs[idx], **kwargs)
 
     if args.all or args.ww:
         for q_mixture_prob in args.ww_probs:
@@ -80,60 +67,33 @@ def main(args):
             kwargs = {'linestyle': '-', 'label': 'ww {}'.format(q_mixture_prob)}
 
             for idx, filename in enumerate(iwae_filenames):
-                if filename == 'log_evidence_history':
-                    data = np.abs(true_log_evidence - ww[filename])
-                else:
-                    data = ww[filename]
-                plot_with_error_bars(logging_iterations, data, axs[idx], **kwargs)
+                plot_with_error_bars(logging_iterations, ww[filename], axs[idx], **kwargs)
 
     if args.all or args.wsw:
         wsw = read_files('wsw', rws_filenames , args.seeds, args.uid)
         kwargs = {'linestyle': '-', 'label': 'wsw'}
 
         for idx, filename in enumerate(iwae_filenames):
-            if filename == 'log_evidence_history':
-                data = np.abs(true_log_evidence - wsw[filename])
-            else:
-                data = wsw[filename]
-            plot_with_error_bars(logging_iterations, data, axs[idx], **kwargs)
+            plot_with_error_bars(logging_iterations, wsw[filename], axs[idx], **kwargs)
 
     if args.all or args.wswa:
         wswa = read_files('wswa', rws_filenames , args.seeds, args.uid)
         kwargs = {'linestyle': '-', 'label': 'wswa'}
 
         for idx, filename in enumerate(iwae_filenames):
-            if filename == 'log_evidence_history':
-                data = np.abs(true_log_evidence - wswa[filename])
-            else:
-                data = wswa[filename]
-            plot_with_error_bars(logging_iterations, data, axs[idx], **kwargs)
+            plot_with_error_bars(logging_iterations, wswa[filename], axs[idx], **kwargs)
 
-    # axs[0].axhline(true_log_evidence, linestyle='-', color='black', label='true')
-    # axs[0].set_ylabel('Avg. test\nlog evidence')
     axs[0].set_yscale('log')
-    axs[0].set_ylabel('Abs. diff. of current\nand true avg. test\nlog evidence')
-    # axs[0].set_ylim(-7, -5)
+    axs[0].set_ylabel('$|| p_{\\theta}(z) - p_{\\theta^*}(z) ||$')
 
     axs[1].set_yscale('log')
-    # axs[1].set_ylim(0)
-    axs[1].set_ylabel('Avg. L2 of current\nto true\nmixture probs.')
+    axs[1].set_ylabel('Avg. test\n$|| q_\phi(z | x) - p_\\theta(z | x) ||$')
 
     axs[2].set_yscale('log')
-    # axs[2].set_ylim(0)
-    axs[2].set_ylabel('Avg. test L2 of\nq to current p')
+    axs[2].set_ylabel('Avg. test\n$|| q_\phi(z | x) - p_{\\theta^*}(z | x) ||$')
 
     axs[3].set_yscale('log')
-    # axs[3].set_ylim(0)
-    axs[3].set_ylabel('Avg. test L2 of\nq to true p')
-
-    axs[4].set_ylim(0)
-    axs[4].set_ylabel('Avg. std. of $\\theta$ \n gradient est.')
-
-    axs[5].set_yscale('log')
-    # axs[5].set_ylim(0)
-    axs[5].set_ylabel('Avg. std. of $\phi$ \n gradient est.')
-
-    axs[6].set_ylabel('Avg. mean of $\phi$ \n gradient est.')
+    axs[3].set_ylabel('Std. of $\phi$ \n gradient est.')
 
     axs[-1].legend(ncol=4, loc='upper center', bbox_to_anchor=(0.5, -0.4))
     axs[-1].set_xlabel('Iteration')
