@@ -78,7 +78,7 @@ def main():
     axs[2, 0].set_yscale('log')
     axs[2, 0].set_ylabel('Std. of $\phi$ \n gradient est.')
 
-    axs[-1, 1].legend(ncol=4, loc='upper center', bbox_to_anchor=(1, -0.33))
+    axs[-1, 1].legend(ncol=4, loc='upper center', bbox_to_anchor=(1, -0.35))
     for i, ax in enumerate(axs[-1]):
         ax.set_xlabel('$K = {}$'.format(num_particles[i]))
 
