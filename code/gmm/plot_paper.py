@@ -20,6 +20,8 @@ plt.rc('axes', linewidth=0.5)            # set the value globally
 plt.rc('xtick.major', width=0.5)            # set the value globally
 plt.rc('ytick.major', width=0.5)            # set the value globally
 plt.rc('lines', linewidth=1)           # line thickness
+plt.rc('ytick.major', size=2)            # set the value globally
+plt.rc('xtick.major', size=2)            # set the value globally
 
 
 def main():
@@ -88,10 +90,10 @@ def main():
 
 
     axs[0, 0].set_yscale('log')
-    axs[0, 0].set_ylabel('$|| p_{\\theta}(z) - p_{\\theta^*}(z) ||$')
+    axs[0, 0].set_ylabel('$|| p_{\\theta}(z) - p_{\\theta_{true}}(z) ||$')
 
     axs[1, 0].set_yscale('log')
-    axs[1, 0].set_ylabel('Avg. test\n$|| q_\phi(z | x) - p_{\\theta^*}(z | x) ||$')
+    axs[1, 0].set_ylabel('Avg. test\n$|| q_\phi(z | x) - p_{\\theta_{true}}(z | x) ||$')
 
     axs[2, 0].set_yscale('log')
     axs[2, 0].set_ylabel('Std. of $\phi$ \n gradient est.')
@@ -99,14 +101,18 @@ def main():
     axs[-1, 1].legend(ncol=6, loc='upper center', bbox_to_anchor=(1, -0.2))
     for i, ax in enumerate(axs[0]):
         ax.set_title('$K = {}$'.format(num_particles[i]))
+    for i, ax in enumerate(axs[-1]):
+        ax.set_xlabel('Iteration')
+        ax.xaxis.set_label_coords(0.5, -0.1)
 
     for axss in axs:
         for ax in axss:
             ax.spines['top'].set_visible(False)
             ax.spines['right'].set_visible(False)
             ax.minorticks_off()
+            ax.set_xticks([0, 100000])
 
-    fig.tight_layout()
+    fig.tight_layout(pad=0)
     filename = 'results/plot_paper.pdf'
     fig.savefig(filename, bbox_inches='tight')
     print('Saved to {}'.format(filename))

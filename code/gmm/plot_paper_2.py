@@ -21,6 +21,10 @@ plt.rc('legend', fontsize=SMALL_SIZE)    # legend fontsize
 plt.rc('figure', titlesize=BIGGER_SIZE)  # fontsize of the figure title
 plt.rc('axes', linewidth=0.5)            # set the value globally
 plt.rc('lines', linewidth=1)           # line thickness
+plt.rc('xtick.major', width=0.5)            # set the value globally
+plt.rc('ytick.major', width=0.5)            # set the value globally
+plt.rc('ytick.major', size=2)            # set the value globally
+plt.rc('xtick.major', size=0)            # set the value globally
 
 
 def main():
@@ -43,7 +47,7 @@ def main():
     num_iterations = np.load('{}/num_iterations_{}.npy'.format(WORKING_DIR, uids[0]))
     saving_interval = np.load('{}/saving_interval_{}.npy'.format(WORKING_DIR, uids[0]))
     saving_iterations = np.arange(0, num_iterations, saving_interval)
-    num_iterations_to_plot = 4
+    num_iterations_to_plot = 3
     iterations_to_plot = saving_iterations[np.floor(
         np.linspace(0, len(saving_iterations) - 1, num=num_iterations_to_plot)
     ).astype(int)]
@@ -72,7 +76,7 @@ def main():
     fig.set_size_inches(width, height)
 
     for iteration_idx, iteration in enumerate(iterations_to_plot):
-        axs[iteration_idx, 0].set_ylabel('i = {}'.format(iteration))
+        axs[iteration_idx, 0].set_ylabel('Iter. {}'.format(iteration))
         for num_particles_idx, num_particles in enumerate(num_particles_list):
             # Plot the generative network
             ax = axs[iteration_idx, num_particles_idx * (num_test_x + 1)]
@@ -82,7 +86,8 @@ def main():
             ax.set_xticklabels([0, 19])
             ax.set_yticks([0, 1])
             ax.set_yticklabels([0, 1])
-            ax.tick_params(length=0)
+            if num_particles_idx != 0:
+                ax.tick_params(length=0)
             ax.set_ylim(-0.05, 1.05)
             ax.set_xlim(-0.5, 19.5)
             if iteration_idx == 0:
