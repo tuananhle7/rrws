@@ -1,5 +1,5 @@
+from util import *
 from gmm import *
-from plot import np_load
 from matplotlib.animation import FuncAnimation
 
 import matplotlib
@@ -81,14 +81,14 @@ def visualize_mlp(mlp, ax=None, vmin=-3, vmax=3, gap=2):
 def main(args):
     softmax_multiplier = 0.5
 
-    num_iterations = int(np_load('num_iterations'))
-    logging_interval = int(np_load('logging_interval'))
-    saving_interval = int(np_load('saving_interval'))
-    num_mixtures = int(np_load('num_mixtures'))
+    num_iterations = int(np.load('{}/num_iterations_{}.npy'.format(WORKING_DIR, args.uid)))
+    logging_interval = int(np.load('{}/logging_interval_{}.npy'.format(WORKING_DIR, args.uid)))
+    saving_interval = int(np.load('{}/saving_interval_{}.npy'.format(WORKING_DIR, args.uid)))
+    num_mixtures = int(np.load('{}/num_mixtures_{}.npy'.format(WORKING_DIR, args.uid)))
 
-    true_p_mixture_probs = np_load('true_p_mixture_probs')
-    true_mean_multiplier = float(np_load('true_mean_multiplier'))
-    true_log_stds = np_load('true_log_stds')
+    true_p_mixture_probs = np.load('{}/true_p_mixture_probs_{}.npy'.format(WORKING_DIR, args.uid))
+    true_mean_multiplier = float(np.load('{}/true_mean_multiplier_{}.npy'.format(WORKING_DIR, args.uid)))
+    true_log_stds = np.load('{}/true_log_stds_{}.npy'.format(WORKING_DIR, args.uid))
 
     p_init_mixture_probs_pre_softmax = np.random.rand(num_mixtures)
     init_log_stds = np.random.rand(num_mixtures)
@@ -97,11 +97,15 @@ def main(args):
     true_generative_network = GenerativeNetwork(np.log(true_p_mixture_probs) / softmax_multiplier, true_mean_multiplier, true_log_stds)
 
     num_q_layers = 3
-    num_experiments = int(args.vimco or args.all) + int(args.ww or args.all) * len(args.ww_probs) + int(args.ws or args.all)
+    num_experiments = int(args.vimco or args.all) + int(args.reinforce or args.all) + int(args.concrete or args.all) + int(args.ww or args.all) * len(args.ww_probs) + int(args.ws or args.all)
+    num_test_x = 5
+    test_x = np.linspace(0, num_mixtures - 1, num=num_test_x) * true_mean_multiplier
 
     if args.visualize_weights or args.visualize_all:
         # Visualize inference network weights
         fig, axs = plt.subplots(num_experiments, 1)
+        if num_experiments == 1:
+            axs = [axs]
         fig.set_size_inches(num_q_layers * 1.0, num_experiments * 1.3)
 
         t = axs[0].set_title('Iteration {}'.format(0), color='black')
@@ -109,6 +113,14 @@ def main(args):
 
         if args.vimco or args.all:
             axs[ax_idx].set_ylabel('vimco')
+            ax_idx += 1
+
+        if args.reinforce or args.all:
+            axs[ax_idx].set_ylabel('reinforce')
+            ax_idx += 1
+
+        if args.concrete or args.all:
+            axs[ax_idx].set_ylabel('concrete')
             ax_idx += 1
 
         if args.ww or args.all:
@@ -131,7 +143,7 @@ def main(args):
             ax_idx = 0
 
             if args.vimco or args.all:
-                filename = 'vimco_{}_{}_{}.pt'.format(iteration, SEED, UID)
+                filename = '{}/vimco_{}_{}_{}.pt'.format(WORKING_DIR, iteration, args.seed, args.uid)
                 iwae_vimco_state_dict = torch.load(filename)
                 iwae_vimco = IWAE(p_init_mixture_probs_pre_softmax, init_mean_multiplier, init_log_stds)
                 iwae_vimco.load_state_dict(iwae_vimco_state_dict)
@@ -139,9 +151,18 @@ def main(args):
                 result = result + [axs[ax_idx].images[0]]
                 ax_idx += 1
 
+            if args.reinforce or args.all:
+                filename = '{}/reinforce_{}_{}_{}.pt'.format(WORKING_DIR, iteration, args.seed, args.uid)
+                iwae_reinforce_state_dict = torch.load(filename)
+                iwae_reinforce = IWAE(p_init_mixture_probs_pre_softmax, init_mean_multiplier, init_log_stds)
+                iwae_reinforce.load_state_dict(iwae_reinforce_state_dict)
+                axs[ax_idx] = visualize_mlp(iwae_reinforce.inference_network.mlp, axs[ax_idx])
+                result = result + [axs[ax_idx].images[0]]
+                ax_idx += 1
+
             if args.ww or args.all:
                 for q_mixture_prob_idx, q_mixture_prob in enumerate(args.ww_probs):
-                    filename = 'ww{}_{}_{}_{}.pt'.format(str(q_mixture_prob).replace('.', '-'), iteration, SEED, UID)
+                    filename = '{}/ww{}_{}_{}_{}.pt'.format(WORKING_DIR, str(q_mixture_prob).replace('.', '-'), iteration, args.seed, args.uid)
                     ww_state_dict = torch.load(filename)
                     ww = RWS(p_init_mixture_probs_pre_softmax, init_mean_multiplier, init_log_stds)
                     ww.load_state_dict(ww_state_dict)
@@ -150,7 +171,7 @@ def main(args):
                     ax_idx += 1
 
             if args.ws or args.all:
-                filename = 'ws_{}_{}_{}.pt'.format(iteration, SEED, UID)
+                filename = '{}/ws_{}_{}_{}.pt'.format(WORKING_DIR, iteration, args.seed, args.uid)
                 ws_state_dict = torch.load(filename)
                 ws = RWS(p_init_mixture_probs_pre_softmax, init_mean_multiplier, init_log_stds)
                 ws.load_state_dict(ws_state_dict)
@@ -162,20 +183,20 @@ def main(args):
 
         anim = FuncAnimation(fig, update, frames=np.arange(0, num_iterations, saving_interval), blit=True)
         # anim = FuncAnimation(fig, update, frames=np.arange(0, saving_interval * 2, saving_interval), blit=True)
-        filename = safe_fname('visualize_q_weights', 'mp4')
+        filename = '{}/visualize_weights_{}_{}.mp4'.format(OUTPUT_DIR, args.seed, args.uid)
         anim.save(filename, dpi=200)
         print('Saved to {}'.format(filename))
 
     if args.visualize_training or args.visualize_all:
         # Visualize generative and inference networks
-        fig, axs = plt.subplots(2, num_mixtures, sharex=True, sharey=True)
-        fig.set_size_inches(2 * num_mixtures, 5)
+        fig, axs = plt.subplots(2, num_test_x, sharex=True, sharey=True)
+        fig.set_size_inches(2 * num_test_x, 5)
 
         ax = axs[0, 0]
         ax.plot(np.arange(num_mixtures), true_generative_network.get_z_params().data.numpy(), label='true', marker='x')
 
         for ax_idx, ax in enumerate(axs[1]):
-            x = Variable(torch.Tensor([true_mean_multiplier * ax_idx]))
+            x = Variable(torch.Tensor([test_x[ax_idx]]))
             ax.set_title('$x = {}$'.format(x.data[0]))
             ax.set_xticks(np.arange(num_mixtures))
             ax.set_xlabel('z')
@@ -186,39 +207,50 @@ def main(args):
 
         iteration = 0
         if args.vimco or args.all:
-            q_iwae_lines = [None] * num_mixtures
-            filename = 'vimco_{}_{}_{}.pt'.format(iteration, SEED, UID)
+            q_iwae_lines = [None] * num_test_x
+            filename = '{}/vimco_{}_{}_{}.pt'.format(WORKING_DIR, iteration, args.seed, args.uid)
             iwae_vimco_state_dict = torch.load(filename)
             iwae_vimco = IWAE(p_init_mixture_probs_pre_softmax, init_mean_multiplier, init_log_stds)
             iwae_vimco.load_state_dict(iwae_vimco_state_dict)
             p_iwae, = axs[0, 0].plot(np.arange(num_mixtures), iwae_vimco.generative_network.get_z_params().data.numpy(), label='vimco', marker='v')
             for ax_idx, ax in enumerate(axs[1]):
-                x = Variable(torch.Tensor([true_mean_multiplier * ax_idx]))
+                x = Variable(torch.Tensor([test_x[ax_idx]]))
                 q_iwae_lines[ax_idx], = ax.plot(np.arange(num_mixtures), iwae_vimco.inference_network.get_z_params(x).data.numpy()[0], label='vimco', marker='v')
 
+        if args.reinforce or args.all:
+            q_iwae_lines = [None] * num_test_x
+            filename = '{}/reinforce_{}_{}_{}.pt'.format(WORKING_DIR, iteration, args.seed, args.uid)
+            iwae_reinforce_state_dict = torch.load(filename)
+            iwae_reinforce = IWAE(p_init_mixture_probs_pre_softmax, init_mean_multiplier, init_log_stds)
+            iwae_reinforce.load_state_dict(iwae_reinforce_state_dict)
+            p_iwae, = axs[0, 0].plot(np.arange(num_mixtures), iwae_reinforce.generative_network.get_z_params().data.numpy(), label='reinforce', marker='.')
+            for ax_idx, ax in enumerate(axs[1]):
+                x = Variable(torch.Tensor([test_x[ax_idx]]))
+                q_iwae_lines[ax_idx], = ax.plot(np.arange(num_mixtures), iwae_reinforce.inference_network.get_z_params(x).data.numpy()[0], label='reinforce', marker='.')
+
         if args.ww or args.all:
-            q_ww_lines = [None] * (len(args.ww_probs) * num_mixtures)
+            q_ww_lines = [None] * (len(args.ww_probs) * num_test_x)
             p_ww_lines = [None] * len(args.ww_probs)
             for q_mixture_prob_idx, q_mixture_prob in enumerate(args.ww_probs):
-                q_mixture_prob_color = str(q_mixture_prob * 0.9)
-                filename = 'ww{}_{}_{}_{}.pt'.format(str(q_mixture_prob).replace('.', '-'), iteration, SEED, UID)
+                q_mixture_prob_color = str(q_mixture_prob * 0.6)
+                filename = '{}/ww{}_{}_{}_{}.pt'.format(WORKING_DIR, str(q_mixture_prob).replace('.', '-'), iteration, args.seed, args.uid)
                 ww_state_dict = torch.load(filename)
                 ww = RWS(p_init_mixture_probs_pre_softmax, init_mean_multiplier, init_log_stds)
                 ww.load_state_dict(ww_state_dict)
                 p_ww_lines[q_mixture_prob_idx], = axs[0, 0].plot(np.arange(num_mixtures), ww.generative_network.get_z_params().data.numpy(), label='ww {}'.format(q_mixture_prob), marker='o', color=q_mixture_prob_color)
                 for ax_idx, ax in enumerate(axs[1]):
-                    x = Variable(torch.Tensor([true_mean_multiplier * ax_idx]))
-                    q_ww_lines[q_mixture_prob_idx * num_mixtures + ax_idx], = ax.plot(np.arange(num_mixtures), ww.inference_network.get_z_params(x).data.numpy()[0], label='ww {}'.format(q_mixture_prob), marker='o', color=q_mixture_prob_color)
+                    x = Variable(torch.Tensor([test_x[ax_idx]]))
+                    q_ww_lines[q_mixture_prob_idx * num_test_x + ax_idx], = ax.plot(np.arange(num_mixtures), ww.inference_network.get_z_params(x).data.numpy()[0], label='ww {}'.format(q_mixture_prob), marker='o', color=q_mixture_prob_color)
 
         if args.ws or args.all:
-            q_ws_lines = [None] * num_mixtures
-            filename = 'ws_{}_{}_{}.pt'.format(iteration, SEED, UID)
+            q_ws_lines = [None] * num_test_x
+            filename = '{}/ws_{}_{}_{}.pt'.format(WORKING_DIR, iteration, args.seed, args.uid)
             ws_state_dict = torch.load(filename)
             ws = RWS(p_init_mixture_probs_pre_softmax, init_mean_multiplier, init_log_stds)
             ws.load_state_dict(ws_state_dict)
             p_ws, = axs[0, 0].plot(np.arange(num_mixtures), ws.generative_network.get_z_params().data.numpy(), label='ws', marker='^')
             for ax_idx, ax in enumerate(axs[1]):
-                x = Variable(torch.Tensor([true_mean_multiplier * ax_idx]))
+                x = Variable(torch.Tensor([test_x[ax_idx]]))
                 q_ws_lines[ax_idx], = ax.plot(np.arange(num_mixtures), ws.inference_network.get_z_params(x).data.numpy()[0], label='ws', marker='^')
 
         axs[0, 0].legend(loc='center left', bbox_to_anchor=(1, 0.5))
@@ -240,59 +272,56 @@ def main(args):
             result = [t]
 
             if args.vimco or args.all:
-                filename = 'vimco_{}_{}_{}.pt'.format(iteration, SEED, UID)
+                filename = '{}/vimco_{}_{}_{}.pt'.format(WORKING_DIR, iteration, args.seed, args.uid)
                 iwae_vimco_state_dict = torch.load(filename)
                 iwae_vimco = IWAE(p_init_mixture_probs_pre_softmax, init_mean_multiplier, init_log_stds)
                 iwae_vimco.load_state_dict(iwae_vimco_state_dict)
                 p_iwae.set_data(np.arange(num_mixtures), iwae_vimco.generative_network.get_z_params().data.numpy())
-                for ax_idx in range(num_mixtures):
-                    x = Variable(torch.Tensor([true_mean_multiplier * ax_idx]))
+                for ax_idx in range(num_test_x):
+                    x = Variable(torch.Tensor([test_x[ax_idx]]))
                     q_iwae_lines[ax_idx].set_data(np.arange(num_mixtures), iwae_vimco.inference_network.get_z_params(x).data.numpy()[0])
+                result = result + [p_iwae] + q_iwae_lines
+
+            if args.reinforce or args.all:
+                filename = '{}/reinforce_{}_{}_{}.pt'.format(WORKING_DIR, iteration, args.seed, args.uid)
+                iwae_reinforce_state_dict = torch.load(filename)
+                iwae_reinforce = IWAE(p_init_mixture_probs_pre_softmax, init_mean_multiplier, init_log_stds)
+                iwae_reinforce.load_state_dict(iwae_reinforce_state_dict)
+                p_iwae.set_data(np.arange(num_mixtures), iwae_reinforce.generative_network.get_z_params().data.numpy())
+                for ax_idx in range(num_test_x):
+                    x = Variable(torch.Tensor([test_x[ax_idx]]))
+                    q_iwae_lines[ax_idx].set_data(np.arange(num_mixtures), iwae_reinforce.inference_network.get_z_params(x).data.numpy()[0])
                 result = result + [p_iwae] + q_iwae_lines
 
             if args.ww or args.all:
                 for q_mixture_prob_idx, q_mixture_prob in enumerate(args.ww_probs):
-                    filename = 'ww{}_{}_{}_{}.pt'.format(str(q_mixture_prob).replace('.', '-'), iteration, SEED, UID)
+                    filename = '{}/ww{}_{}_{}_{}.pt'.format(WORKING_DIR, str(q_mixture_prob).replace('.', '-'), iteration, args.seed, args.uid)
                     ww_state_dict = torch.load(filename)
                     ww = RWS(p_init_mixture_probs_pre_softmax, init_mean_multiplier, init_log_stds)
                     ww.load_state_dict(ww_state_dict)
                     p_ww_lines[q_mixture_prob_idx].set_data(np.arange(num_mixtures), ww.generative_network.get_z_params().data.numpy())
-                    for ax_idx in range(num_mixtures):
-                        x = Variable(torch.Tensor([true_mean_multiplier * ax_idx]))
-                        q_ww_lines[q_mixture_prob_idx * num_mixtures + ax_idx].set_data(np.arange(num_mixtures), ww.inference_network.get_z_params(x).data.numpy()[0])
+                    for ax_idx in range(num_test_x):
+                        x = Variable(torch.Tensor([test_x[ax_idx]]))
+                        q_ww_lines[q_mixture_prob_idx * num_test_x + ax_idx].set_data(np.arange(num_mixtures), ww.inference_network.get_z_params(x).data.numpy()[0])
                 result = result + p_ww_lines + q_ww_lines
 
             if args.ws or args.all:
-                filename = 'ws_{}_{}_{}.pt'.format(iteration, SEED, UID)
+                filename = '{}/ws_{}_{}_{}.pt'.format(WORKING_DIR, iteration, args.seed, args.uid)
                 ws_state_dict = torch.load(filename)
                 ws = RWS(p_init_mixture_probs_pre_softmax, init_mean_multiplier, init_log_stds)
                 ws.load_state_dict(ws_state_dict)
                 p_ws.set_data(np.arange(num_mixtures), ws.generative_network.get_z_params().data.numpy())
-                for ax_idx in range(num_mixtures):
-                    x = Variable(torch.Tensor([true_mean_multiplier * ax_idx]))
+                for ax_idx in range(num_test_x):
+                    x = Variable(torch.Tensor([test_x[ax_idx]]))
                     q_ws_lines[ax_idx].set_data(np.arange(num_mixtures), ws.inference_network.get_z_params(x).data.numpy()[0])
                 result = result + [p_ws] + q_ws_lines
 
             return result
 
         anim = FuncAnimation(fig, update, frames=np.arange(0, num_iterations, saving_interval), blit=True)
-        filename = safe_fname('visualize', 'mp4')
+        filename = '{}/visualize_training_{}_{}.mp4'.format(OUTPUT_DIR, args.seed, args.uid)
         anim.save(filename, dpi=200)
         print('Saved to {}'.format(filename))
-
-
-def np_load(filename):
-    return np.load('{}_{:d}_{}.npy'.format(
-        os.path.splitext(filename)[0], SEED, UID
-    ))
-
-
-SEED = 1
-UID = ''
-
-
-def safe_fname(fname, ext):
-    return '{}_{:d}_{}.{}'.format(fname, SEED, UID, ext)
 
 
 if __name__ == '__main__':
@@ -300,7 +329,7 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(description='GMM open universe')
     parser.add_argument('--uid', type=str, default='', metavar='U',
-                        help='run UID')
+                        help='run args.uid')
     parser.add_argument('--seed', type=int, default=1, metavar='S',
                         help='run seed')
     parser.add_argument('--all', action='store_true', default=False)
@@ -311,11 +340,10 @@ if __name__ == '__main__':
     parser.add_argument('--ww-probs', nargs='*', type=float, default=[1.0])
     parser.add_argument('--wsw', action='store_true', default=False)
     parser.add_argument('--wswa', action='store_true', default=False)
+    parser.add_argument('--concrete', action='store_true', default=False)
     parser.add_argument('--visualize-weights', action='store_true', default=False)
     parser.add_argument('--visualize-training', action='store_true', default=False)
     parser.add_argument('--visualize-all', action='store_true', default=False)
     args = parser.parse_args()
-    SEED = args.seed
-    UID = args.uid
 
     main(args)

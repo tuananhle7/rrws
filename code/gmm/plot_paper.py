@@ -4,7 +4,7 @@ import numpy as np
 
 from util import *
 
-SMALL_SIZE = 6
+SMALL_SIZE = 5.5
 MEDIUM_SIZE = 9
 BIGGER_SIZE = 11
 
@@ -16,12 +16,17 @@ plt.rc('xtick', labelsize=SMALL_SIZE)    # fontsize of the tick labels
 plt.rc('ytick', labelsize=SMALL_SIZE)    # fontsize of the tick labels
 plt.rc('legend', fontsize=SMALL_SIZE)    # legend fontsize
 plt.rc('figure', titlesize=BIGGER_SIZE)  # fontsize of the figure title
-plt.rc('lines', linewidth=0.5)           # line thickness
+plt.rc('axes', linewidth=0.5)            # set the value globally
+plt.rc('xtick.major', width=0.5)            # set the value globally
+plt.rc('ytick.major', width=0.5)            # set the value globally
+plt.rc('lines', linewidth=1)           # line thickness
 
 
 def main():
     seeds = np.arange(1, 11, dtype=int)
     uids = ['3319b6a9', '03ee5995', '179b8125', '871c4fce']
+    concrete_uids = ['eaf03c8b', '7da5406d', '2c000794', '5b1962a9']
+    reinforce_uids = ['9b28ea68', 'f6ebee25', 'e520c68c', '4c1be354']
     num_particles = [2, 5, 10, 20]
     ww_probs = [1.0, 0.8]
 
@@ -33,25 +38,14 @@ def main():
     fig, axs = plt.subplots(3, len(uids), sharex=True, sharey='row')
     fig.set_size_inches(5.5, 3.5)
 
-    for axss in axs:
-        for ax in axss:
-            ax.spines['top'].set_visible(False)
-            ax.spines['right'].set_visible(False)
-
     for ax_idx in range(len(uids)):
         uid = uids[ax_idx]
+        concrete_uid = concrete_uids[ax_idx]
+        reinforce_uid = reinforce_uids[ax_idx]
 
-        ## IWAE
         iwae_filenames = ['p_mixture_probs_norm_history', 'true_posterior_norm_history', 'q_grad_std_history']
-
-        # VIMCO
-        iwae_vimco = read_files('iwae_vimco', iwae_filenames, seeds, uid)
-        kwargs = {'linestyle': '-', 'label': 'vimco'}
-
-        for idx, filename in enumerate(iwae_filenames):
-            plot_with_error_bars(logging_iterations, iwae_vimco[filename], axs[idx, ax_idx], **kwargs)
-
         rws_filenames = ['p_mixture_probs_norm_history', 'true_posterior_norm_history', 'q_grad_std_history']
+        concrete_names = ['prior_l2_history', 'true_posterior_l2_history', 'inference_network_grad_phi_std_history']
 
         # WS
         ws = read_files('ws', rws_filenames , seeds, uid)
@@ -60,6 +54,29 @@ def main():
         for idx, filename in enumerate(iwae_filenames):
             plot_with_error_bars(logging_iterations, ws[filename], axs[idx, ax_idx], **kwargs)
 
+        # Concrete
+        concrete = read_files('concrete', concrete_names, seeds, concrete_uid)
+        kwargs = {'linestyle': '-', 'label': 'concrete'}
+
+        for idx, name in enumerate(concrete_names):
+            plot_with_error_bars(logging_iterations, concrete[name], axs[idx, ax_idx], **kwargs)
+
+        ## IWAE
+        # Reinforce
+        iwae_reinforce = read_files('iwae_reinforce', iwae_filenames, seeds, reinforce_uid)
+        kwargs = {'linestyle': '-', 'label': 'reinforce'}
+
+        for idx, filename in enumerate(iwae_filenames):
+            plot_with_error_bars(logging_iterations, iwae_reinforce[filename], axs[idx, ax_idx], **kwargs)
+
+        # VIMCO
+        iwae_vimco = read_files('iwae_vimco', iwae_filenames, seeds, uid)
+        kwargs = {'linestyle': '-', 'label': 'vimco'}
+
+        for idx, filename in enumerate(iwae_filenames):
+            plot_with_error_bars(logging_iterations, iwae_vimco[filename], axs[idx, ax_idx], **kwargs)
+
+
         # WW
         for q_mixture_prob in ww_probs:
             ww = read_files('ww_{}'.format(str(q_mixture_prob).replace('.', '-')), rws_filenames, seeds, uid)
@@ -67,6 +84,7 @@ def main():
 
             for idx, filename in enumerate(iwae_filenames):
                 plot_with_error_bars(logging_iterations, ww[filename], axs[idx, ax_idx], **kwargs)
+
 
 
     axs[0, 0].set_yscale('log')
@@ -78,9 +96,15 @@ def main():
     axs[2, 0].set_yscale('log')
     axs[2, 0].set_ylabel('Std. of $\phi$ \n gradient est.')
 
-    axs[-1, 1].legend(ncol=4, loc='upper center', bbox_to_anchor=(1, -0.35))
-    for i, ax in enumerate(axs[-1]):
-        ax.set_xlabel('$K = {}$'.format(num_particles[i]))
+    axs[-1, 1].legend(ncol=6, loc='upper center', bbox_to_anchor=(1, -0.2))
+    for i, ax in enumerate(axs[0]):
+        ax.set_title('$K = {}$'.format(num_particles[i]))
+
+    for axss in axs:
+        for ax in axss:
+            ax.spines['top'].set_visible(False)
+            ax.spines['right'].set_visible(False)
+            ax.minorticks_off()
 
     fig.tight_layout()
     filename = 'results/plot_paper.pdf'

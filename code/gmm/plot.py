@@ -21,11 +21,11 @@ plt.rc('lines', linewidth=0.5)           # line thickness
 
 
 def main(args):
-    true_log_evidence = np.load('{}/true_log_evidence_{}.npy'.format(WORKING_DIR, args.uid))
+    # true_log_evidence = np.load('{}/true_log_evidence_{}.npy'.format(WORKING_DIR, args.uid))
     num_mixtures = np.load('{}/num_mixtures_{}.npy'.format(WORKING_DIR, args.uid))
     num_iterations = np.load('{}/num_iterations_{}.npy'.format(WORKING_DIR, args.uid))
-    logging_interval = np.load('{}/logging_interval_{}.npy'.format(WORKING_DIR, args.uid))
-    logging_iterations = np.arange(0, num_iterations, logging_interval)
+    saving_interval = np.load('{}/saving_interval_{}.npy'.format(WORKING_DIR, args.uid))
+    saving_iterations = np.arange(0, num_iterations, saving_interval)
 
     # Plotting
     fig, axs = plt.subplots(4, 1, sharex=True)
@@ -42,14 +42,26 @@ def main(args):
         kwargs = {'linestyle': '-', 'label': 'reinforce'}
 
         for idx, filename in enumerate(iwae_filenames):
-            plot_with_error_bars(logging_iterations, iwae_reinforce[filename], axs[idx], **kwargs)
+            plot_with_error_bars(saving_iterations, iwae_reinforce[filename], axs[idx], **kwargs)
 
     if args.all or args.vimco:
         iwae_vimco = read_files('iwae_vimco', iwae_filenames, args.seeds, args.uid)
         kwargs = {'linestyle': '-', 'label': 'vimco'}
 
         for idx, filename in enumerate(iwae_filenames):
-            plot_with_error_bars(logging_iterations, iwae_vimco[filename], axs[idx], **kwargs)
+            plot_with_error_bars(saving_iterations, iwae_vimco[filename], axs[idx], **kwargs)
+
+    # Concrete
+    concrete_filenames = ['prior_l2_history', 'posterior_l2_history', 'true_posterior_l2_history', 'inference_network_grad_phi_std_history']
+    if args.all or args.concrete:
+        concrete = read_files('concrete', concrete_filenames, args.seeds, args.uid)
+        kwargs = {'linestyle': '-', 'label': 'concrete'}
+
+        # print(concrete)
+        # print(saving_iterations)
+
+        for idx, filename in enumerate(concrete_filenames):
+            plot_with_error_bars(saving_iterations, concrete[filename], axs[idx], **kwargs)
 
     ## RWS
     rws_filenames = ['p_mixture_probs_norm_history', 'posterior_norm_history', 'true_posterior_norm_history', 'q_grad_std_history']
@@ -59,7 +71,7 @@ def main(args):
         kwargs = {'linestyle': '-', 'label': 'ws'}
 
         for idx, filename in enumerate(iwae_filenames):
-            plot_with_error_bars(logging_iterations, ws[filename], axs[idx], **kwargs)
+            plot_with_error_bars(saving_iterations, ws[filename], axs[idx], **kwargs)
 
     if args.all or args.ww:
         for q_mixture_prob in args.ww_probs:
@@ -67,21 +79,21 @@ def main(args):
             kwargs = {'linestyle': '-', 'label': 'ww {}'.format(q_mixture_prob)}
 
             for idx, filename in enumerate(iwae_filenames):
-                plot_with_error_bars(logging_iterations, ww[filename], axs[idx], **kwargs)
+                plot_with_error_bars(saving_iterations, ww[filename], axs[idx], **kwargs)
 
     if args.all or args.wsw:
         wsw = read_files('wsw', rws_filenames , args.seeds, args.uid)
         kwargs = {'linestyle': '-', 'label': 'wsw'}
 
         for idx, filename in enumerate(iwae_filenames):
-            plot_with_error_bars(logging_iterations, wsw[filename], axs[idx], **kwargs)
+            plot_with_error_bars(saving_iterations, wsw[filename], axs[idx], **kwargs)
 
     if args.all or args.wswa:
         wswa = read_files('wswa', rws_filenames , args.seeds, args.uid)
         kwargs = {'linestyle': '-', 'label': 'wswa'}
 
         for idx, filename in enumerate(iwae_filenames):
-            plot_with_error_bars(logging_iterations, wswa[filename], axs[idx], **kwargs)
+            plot_with_error_bars(saving_iterations, wswa[filename], axs[idx], **kwargs)
 
     axs[0].set_yscale('log')
     axs[0].set_ylabel('$|| p_{\\theta}(z) - p_{\\theta^*}(z) ||$')
@@ -137,6 +149,7 @@ if __name__ == '__main__':
     parser.add_argument('--all', action='store_true', default=False)
     parser.add_argument('--reinforce', action='store_true', default=False)
     parser.add_argument('--vimco', action='store_true', default=False)
+    parser.add_argument('--concrete', action='store_true', default=False)
     parser.add_argument('--ws', action='store_true', default=False)
     parser.add_argument('--ww', action='store_true', default=False)
     parser.add_argument('--ww-probs', nargs='*', type=float, default=[1.0])
