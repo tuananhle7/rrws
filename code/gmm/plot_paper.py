@@ -29,6 +29,7 @@ def main():
     uids = ['3319b6a9', '03ee5995', '179b8125', '871c4fce']
     concrete_uids = ['eaf03c8b', '7da5406d', '2c000794', '5b1962a9']
     reinforce_uids = ['9b28ea68', 'f6ebee25', 'e520c68c', '4c1be354']
+    relax_uids = ['23298d9c', '9de291f9', '54cfbdb8', 'bd1099fa']
     num_particles = [2, 5, 10, 20]
     ww_probs = [1.0, 0.8]
 
@@ -44,45 +45,57 @@ def main():
         uid = uids[ax_idx]
         concrete_uid = concrete_uids[ax_idx]
         reinforce_uid = reinforce_uids[ax_idx]
+        relax_uid = relax_uids[ax_idx]
 
         iwae_filenames = ['p_mixture_probs_norm_history', 'true_posterior_norm_history', 'q_grad_std_history']
         rws_filenames = ['p_mixture_probs_norm_history', 'true_posterior_norm_history', 'q_grad_std_history']
         concrete_names = ['prior_l2_history', 'true_posterior_l2_history', 'inference_network_grad_phi_std_history']
+        relax_names = concrete_names
 
         # WS
         ws = read_files('ws', rws_filenames , seeds, uid)
-        kwargs = {'linestyle': '-', 'label': 'ws'}
+        kwargs = {'linestyle': '-', 'label': 'ws', 'color': 'C1'}
 
         for idx, filename in enumerate(iwae_filenames):
             plot_with_error_bars(logging_iterations, ws[filename], axs[idx, ax_idx], **kwargs)
 
         # Concrete
         concrete = read_files('concrete', concrete_names, seeds, concrete_uid)
-        kwargs = {'linestyle': '-', 'label': 'concrete'}
+        kwargs = {'linestyle': '-', 'label': 'concrete', 'color': 'C0'}
 
         for idx, name in enumerate(concrete_names):
             plot_with_error_bars(logging_iterations, concrete[name], axs[idx, ax_idx], **kwargs)
 
+        # Relax
+        # if ax_idx == 0:
+        relax = read_files('relax', relax_names, [1], relax_uid)
+        kwargs = {'linestyle': '-', 'label': 'relax', 'color': 'C3'}
+
+        for idx, name in enumerate(relax_names):
+            # plot_with_error_bars(logging_iterations, relax[name], axs[idx, ax_idx], **kwargs)
+            # print(relax[name][0])
+            axs[idx, ax_idx].plot(logging_iterations, relax[name][0], **kwargs)
+
         ## IWAE
         # Reinforce
         iwae_reinforce = read_files('iwae_reinforce', iwae_filenames, seeds, reinforce_uid)
-        kwargs = {'linestyle': '-', 'label': 'reinforce'}
+        kwargs = {'linestyle': '-', 'label': 'reinforce', 'color': 'C4'}
 
         for idx, filename in enumerate(iwae_filenames):
             plot_with_error_bars(logging_iterations, iwae_reinforce[filename], axs[idx, ax_idx], **kwargs)
 
         # VIMCO
         iwae_vimco = read_files('iwae_vimco', iwae_filenames, seeds, uid)
-        kwargs = {'linestyle': '-', 'label': 'vimco'}
+        kwargs = {'linestyle': '-', 'label': 'vimco', 'color': 'C5'}
 
         for idx, filename in enumerate(iwae_filenames):
             plot_with_error_bars(logging_iterations, iwae_vimco[filename], axs[idx, ax_idx], **kwargs)
 
 
         # WW
-        for q_mixture_prob in ww_probs:
+        for q_mixture_prob_idx, q_mixture_prob in enumerate(ww_probs):
             ww = read_files('ww_{}'.format(str(q_mixture_prob).replace('.', '-')), rws_filenames, seeds, uid)
-            kwargs = {'linestyle': '-', 'label': 'ww {}'.format(q_mixture_prob)}
+            kwargs = {'linestyle': '-', 'label': 'ww {}'.format(q_mixture_prob), 'color': 'C{}'.format(q_mixture_prob_idx + 6)}
 
             for idx, filename in enumerate(iwae_filenames):
                 plot_with_error_bars(logging_iterations, ww[filename], axs[idx, ax_idx], **kwargs)
@@ -98,7 +111,7 @@ def main():
     axs[2, 0].set_yscale('log')
     axs[2, 0].set_ylabel('Std. of $\phi$ \n gradient est.')
 
-    axs[-1, 1].legend(ncol=6, loc='upper center', bbox_to_anchor=(1, -0.2))
+    axs[-1, 1].legend(ncol=7, loc='upper center', bbox_to_anchor=(1, -0.2))
     for i, ax in enumerate(axs[0]):
         ax.set_title('$K = {}$'.format(num_particles[i]))
     for i, ax in enumerate(axs[-1]):

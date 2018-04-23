@@ -8,6 +8,9 @@ import torch.utils.data
 import uuid
 
 
+epsilon = 1e-6
+
+
 class Prior(nn.Module):
     def __init__(self, init_mixture_probs_pre_softmax, softmax_multiplier=0.5):
         super(Prior, self).__init__()
@@ -56,7 +59,9 @@ class InferenceNetwork(nn.Module):
         return self.mlp(observation.unsqueeze(-1))
 
     def forward(self, observation):
-        return torch.distributions.OneHotCategorical(probs=self.probs(observation))
+        return torch.distributions.OneHotCategorical(
+            probs=self.probs(observation)
+        )
 
 
 class ControlVariate(nn.Module):
@@ -64,12 +69,11 @@ class ControlVariate(nn.Module):
         super(ControlVariate, self).__init__()
         self.num_mixtures = num_mixtures
         self.mlp = nn.Sequential(
-            nn.Linear(1 + num_mixtures, 16),
+            nn.Linear(num_mixtures + 1, 16),
             nn.Tanh(),
             nn.Linear(16, 16),
             nn.Tanh(),
-            nn.Linear(16, 1),
-            nn.ReLU()
+            nn.Linear(16, 1)
         )
 
     def forward(self, aux, observation):
@@ -79,14 +83,19 @@ class ControlVariate(nn.Module):
 
 
 # This implements Appendix C in the REBAR paper
-def sample_relax(inference_network, control_variate, observation, num_particles):
+def sample_relax(inference_network, control_variate,
+                 observation, num_particles):
     batch_size = len(observation)
     num_mixtures = inference_network.num_mixtures
     probs = inference_network.probs(observation)
-    probs_expanded = probs.unsqueeze(1).expand(batch_size, num_particles, num_mixtures).contiguous().view(batch_size * num_particles, num_mixtures)
+    probs_expanded = probs.unsqueeze(1).expand(
+        batch_size, num_particles, num_mixtures
+    ).contiguous().view(batch_size * num_particles, num_mixtures)
 
     # latent_aux
-    u = torch.distributions.Uniform(0, 1).sample(sample_shape=(batch_size * num_particles, num_mixtures))
+    u = torch.distributions.Uniform(0 + epsilon, 1 - epsilon).sample(
+        sample_shape=(batch_size * num_particles, num_mixtures)
+    )
     latent_aux = torch.log(probs_expanded) - torch.log(-torch.log(u))
 
     # latent
@@ -96,46 +105,51 @@ def sample_relax(inference_network, control_variate, observation, num_particles)
     latent[arange, k] = 1
 
     # latent_aux_tilde
-    v = torch.distributions.Uniform(0, 1).sample(sample_shape=(batch_size * num_particles, num_mixtures))
+    v = torch.distributions.Uniform(0 + epsilon, 1 - epsilon).sample(
+        sample_shape=(batch_size * num_particles, num_mixtures)
+    )
     latent_aux_tilde = torch.zeros(batch_size * num_particles, num_mixtures)
     latent_aux_tilde[latent.byte()] = -torch.log(-torch.log(v[latent.byte()]))
-    latent_aux_tilde[1 - latent.byte()] = -torch.log(-torch.log(v[1 - latent.byte()]) /
-                                                     probs_expanded[1 - latent.byte()] -
-                                                     torch.log(v[latent.byte()])\
-                                                         .unsqueeze(-1)\
-                                                         .expand(-1, num_mixtures - 1)\
-                                                         .contiguous().view(-1))
-    return [x.view(batch_size, num_particles, num_mixtures) for x in [latent, latent_aux, latent_aux_tilde]]
+    latent_aux_tilde[1 - latent.byte()] = -torch.log(
+        -torch.log(v[1 - latent.byte()]) / probs_expanded[1 - latent.byte()] -
+        torch.log(v[latent.byte()])
+        .unsqueeze(-1).expand(-1, num_mixtures - 1).contiguous().view(-1)
+    )
+    return [x.view(batch_size, num_particles, num_mixtures)
+            for x in [latent, latent_aux, latent_aux_tilde]]
 
 
 def elbo_relax(prior, likelihood, inference_network, control_variate,
                observation, num_particles):
     batch_size = len(observation)
     num_mixtures = prior.num_mixtures
-    latent, latent_aux, latent_aux_tilde = sample_relax(inference_network, control_variate,
-                                                        observation, num_particles)
+    latent, latent_aux, latent_aux_tilde = sample_relax(
+        inference_network, control_variate, observation, num_particles
+    )
     observation_expanded = observation.unsqueeze(-1).expand(-1, num_particles)
     log_inf = inference_network(observation).log_prob(latent.t()).t()
     logweight = prior().log_prob(latent) + \
-                likelihood(latent).log_prob(observation_expanded) - \
-                log_inf
+        likelihood(latent).log_prob(observation_expanded) - \
+        log_inf
     log_evidence = logsumexp(logweight, dim=1) - np.log(num_particles)
     c, c_tilde = [
-        logsumexp(control_variate(
+        torch.mean(control_variate(
             aux.view(-1, num_mixtures),
             observation_expanded.contiguous().view(-1)
-        ).contiguous().view(batch_size, num_particles), dim=1) - np.log(num_particles)
+        ).contiguous().view(batch_size, num_particles), dim=1)
         for aux in [latent_aux, latent_aux_tilde]
     ]
-    return (log_evidence - c_tilde).detach() * torch.sum(log_inf, dim=1) + c - c_tilde + log_evidence
+    return (log_evidence - c_tilde).detach() * torch.sum(log_inf, dim=1) + \
+        c - c_tilde + log_evidence
 
 
 def train_relax(prior, likelihood, inference_network, control_variate,
                 num_particles, dataloader, num_iterations, callback):
-    inf_params = inference_network.parameters()
-    num_inf_params = sum([inf_param.nelement() for inf_param in inf_params])
-    iwae_parameters = itertools.chain(prior.parameters(), inf_params)
-    iwae_optimizer = torch.optim.Adam(iwae_parameters)
+    num_inf_params = sum([inf_param.nelement()
+                          for inf_param in inference_network.parameters()])
+    iwae_optimizer = torch.optim.Adam(
+        itertools.chain(prior.parameters(), inference_network.parameters())
+    )
     control_variate_optimizer = torch.optim.Adam(control_variate.parameters())
 
     for iteration_idx, observation in enumerate(dataloader):
@@ -143,18 +157,26 @@ def train_relax(prior, likelihood, inference_network, control_variate,
             break
 
         iwae_optimizer.zero_grad()
-        loss = -torch.mean(elbo_relax(prior, likelihood, inference_network, control_variate,
-                                      observation, num_particles))
+        control_variate_optimizer.zero_grad()
+        loss = -torch.mean(elbo_relax(
+            prior, likelihood, inference_network, control_variate, observation,
+            num_particles
+        ))
+        if torch.isnan(loss):
+            import pdb; pdb.set_trace()
         loss.backward(create_graph=True)
         iwae_optimizer.step()
 
         control_variate_optimizer.zero_grad()
         torch.autograd.backward(
-            [2 * inf_param.grad for inf_param in inf_params],
-            [inf_param.grad.detach() for inf_param in inf_params]
+            [2 * inf_param.grad / num_inf_params
+             for inf_param in inference_network.parameters()],
+            [inf_param.grad.detach()
+             for inf_param in inference_network.parameters()]
         )
-        callback(iteration_idx, prior, likelihood, inference_network, control_variate, observation)
         control_variate_optimizer.step()
+        callback(iteration_idx, prior, likelihood, inference_network,
+                 control_variate, observation)
 
 
 class SyntheticDataset(torch.utils.data.Dataset):
@@ -221,8 +243,9 @@ def get_posterior(prior, likelihood, observation):
 
 
 class TrainingStats(object):
-    def __init__(self, saving_interval, logging_interval, true_prior, likelihood, num_test_data,
-                 num_mc_samples, num_particles, uid, seed):
+    def __init__(self, saving_interval, logging_interval, true_prior,
+                 likelihood, num_test_data, num_mc_samples, num_particles, uid,
+                 seed):
         self.saving_interval = saving_interval
         self.logging_interval = logging_interval
         self.true_prior = true_prior
@@ -239,8 +262,9 @@ class TrainingStats(object):
         self.true_posterior_l2_history = []
         self.inference_network_grad_phi_std_history = []
 
-        dataloader = get_synthetic_dataloader(true_prior, likelihood, num_test_data)
-        self.test_observation = next(iter(dataloader))
+        self.test_observation = next(iter(get_synthetic_dataloader(
+            true_prior, likelihood, num_test_data
+        )))
         self.true_posterior = get_posterior(
             true_prior, likelihood, self.test_observation
         ).detach().numpy()
@@ -253,7 +277,8 @@ class TrainingStats(object):
                 prior.probs().detach().numpy() -
                 self.true_prior.probs().detach().numpy()
             ))
-            posterior = get_posterior(prior, likelihood, self.test_observation).detach().numpy()
+            posterior = get_posterior(prior, likelihood,
+                                      self.test_observation).detach().numpy()
             self.posterior_l2_history.append(np.mean(np.linalg.norm(
                 inference_network.probs(
                     self.test_observation
@@ -278,12 +303,17 @@ class TrainingStats(object):
                 prior.zero_grad()
                 inference_network.zero_grad()
                 control_variate.zero_grad()
-                loss = -torch.mean(elbo_relax(prior, likelihood, inference_network, control_variate,
-                                              observation, self.num_particles))
+                loss = -torch.mean(elbo_relax(
+                    prior, likelihood, inference_network, control_variate,
+                    observation, self.num_particles
+                ))
                 loss.backward()
                 inference_network_grad_phi_std.update(
                     [p.grad for p in inference_network.parameters()]
                 )
+                prior.zero_grad()
+                inference_network.zero_grad()
+                control_variate.zero_grad()
             self.inference_network_grad_phi_std_history.append(
                 inference_network_grad_phi_std.avg_of_means_stds()[1]
             )
@@ -353,8 +383,9 @@ def main(args, uid):
             seed=seed
         )
         train_relax(prior, likelihood, inference_network, control_variate,
-                    num_particles, get_synthetic_dataloader(true_prior, likelihood, batch_size),
-                    num_iterations, training_stats)
+                    num_particles, get_synthetic_dataloader(
+                        true_prior, likelihood, batch_size
+                    ), num_iterations, training_stats)
         for data, name in zip(
             [
                 training_stats.prior_l2_history,
@@ -387,7 +418,7 @@ if __name__ == '__main__':
     parser.add_argument('--num-particles', type=int, default=2)
     parser.add_argument('--num-iterations', type=int, default=100000)
     parser.add_argument('--saving-interval', type=int, default=1000)
-    parser.add_argument('--logging-interval', type=int, default=1000)
+    parser.add_argument('--logging-interval', type=int, default=50000)
     parser.add_argument('--seeds', nargs='*', type=int, default=[1])
     args = parser.parse_args()
     args.cuda = args.cuda and torch.cuda.is_available()

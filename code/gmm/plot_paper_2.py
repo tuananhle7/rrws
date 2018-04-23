@@ -2,6 +2,7 @@ import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 import dgm
+import gmm_relax
 
 from gmm import *
 from gmm_concrete import *
@@ -27,17 +28,28 @@ plt.rc('ytick.major', size=2)            # set the value globally
 plt.rc('xtick.major', size=0)            # set the value globally
 
 
+def bar(ax, x, data, width, labels, **kwargs):
+    num_data = len(data)
+    group_width = num_data * width
+    for idx, (height, label) in enumerate(zip(data, labels)):
+        ax.bar(x - group_width / 2 + idx * width, height, width, label=label, align='edge', **kwargs)
+    return ax
+
+
 def main():
     seeds = np.arange(1, 11, dtype=int)
     # uids = ['3319b6a9', '03ee5995', '179b8125', '871c4fce']
     # concrete_uids = ['eaf03c8b', '7da5406d', '2c000794', '5b1962a9']
     # reinforce_uids = ['9b28ea68', 'f6ebee25', 'e520c68c', '4c1be354']
+    # relax_uids = ['23298d9c', '9de291f9', '54cfbdb8', 'bd1099fa']
     uids = ['3319b6a9', '871c4fce']
     concrete_uids = ['eaf03c8b', '5b1962a9']
     reinforce_uids = ['9b28ea68', '4c1be354']
+    relax_uids = ['23298d9c', 'bd1099fa']
     iwae_filenames = ['p_mixture_probs_norm_history', 'true_posterior_norm_history', 'q_grad_std_history']
     rws_filenames = ['p_mixture_probs_norm_history', 'true_posterior_norm_history', 'q_grad_std_history']
     concrete_names = ['prior_l2_history', 'true_posterior_l2_history', 'inference_network_grad_phi_std_history']
+    relax_names = concrete_names
 
     # num_particles_list = [2, 5, 10, 20]
     num_particles_list = [2, 20]
@@ -97,8 +109,12 @@ def main():
             # ax.spines['left'].set_visible(False)
             # ax.tick_params(bottom="off", left="off")
 
+            # data = []
+            # labels = []
             ## True generative network
             ax.plot(np.arange(num_mixtures), true_generative_network.get_z_params().data.numpy(), label='true', linewidth=matplotlib.rcParams['lines.linewidth'] * 1.5, color='black')
+            # data.append(true_generative_network.get_z_params().data.numpy())
+            # labels.append('true')
 
             ## Learned generative network
             ### WS
@@ -106,7 +122,9 @@ def main():
             ws_state_dict = torch.load(filename)
             ws = RWS(p_init_mixture_probs_pre_softmax, init_mean_multiplier, init_log_stds)
             ws.load_state_dict(ws_state_dict)
-            ax.plot(np.arange(num_mixtures), ws.generative_network.get_z_params().data.numpy(), label='ws', alpha=0.8)
+            ax.plot(np.arange(num_mixtures), ws.generative_network.get_z_params().data.numpy(), label='ws', alpha=0.8, color='C1')
+            # data.append(ws.generative_network.get_z_params().data.numpy())
+            # labels.append('ws')
 
             ### Concrete
             filename = '{}/concrete_{}_{}_{}.pt'.format(WORKING_DIR, iteration, seeds[0], concrete_uids[num_particles_idx])
@@ -123,20 +141,38 @@ def main():
                 )
             )
             concrete.load_state_dict(concrete_state_dict)
-            ax.plot(np.arange(num_mixtures), concrete.initial.probs().data.numpy(), label='concrete', alpha=0.8)
+            ax.plot(np.arange(num_mixtures), concrete.initial.probs().data.numpy(), label='concrete', alpha=0.8, color='C0')
+            # data.append(concrete.initial.probs().data.numpy())
+            # labels.append('concrete')
+
+            ### Relax
+            # if num_particles_idx == 0:
+            filename = '{}/relax_{}_{}_{}.pt'.format(WORKING_DIR, iteration, seeds[0], relax_uids[num_particles_idx])
+            relax_state_dict = torch.load(filename)
+            relax_prior = gmm_relax.Prior(p_init_mixture_probs_pre_softmax, softmax_multiplier)
+            relax_inference_network = gmm_relax.InferenceNetwork(num_mixtures)
+            relax_prior.load_state_dict(relax_state_dict['prior'])
+            relax_inference_network.load_state_dict(relax_state_dict['inference_network'])
+            ax.plot(np.arange(num_mixtures), relax_prior.probs().data.numpy(), label='relax', alpha=0.8, color='C3')
+            # data.append(relax_prior.probs().data.numpy())
+            # labels.append('relax')
 
             ### VIMCO, Reinforce
             filename = '{}/reinforce_{}_{}_{}.pt'.format(WORKING_DIR, iteration, seeds[0], reinforce_uids[num_particles_idx])
             iwae_reinforce_state_dict = torch.load(filename)
             iwae_reinforce = IWAE(p_init_mixture_probs_pre_softmax, init_mean_multiplier, init_log_stds)
             iwae_reinforce.load_state_dict(iwae_reinforce_state_dict)
-            ax.plot(np.arange(num_mixtures), iwae_reinforce.generative_network.get_z_params().data.numpy(), label='reinforce', alpha=0.8)
+            ax.plot(np.arange(num_mixtures), iwae_reinforce.generative_network.get_z_params().data.numpy(), label='reinforce', alpha=0.8, color='C4')
+            # data.append(iwae_reinforce.generative_network.get_z_params().data.numpy())
+            # labels.append('reinforce')
 
             filename = '{}/vimco_{}_{}_{}.pt'.format(WORKING_DIR, iteration, seeds[0], uids[num_particles_idx])
             iwae_vimco_state_dict = torch.load(filename)
             iwae_vimco = IWAE(p_init_mixture_probs_pre_softmax, init_mean_multiplier, init_log_stds)
             iwae_vimco.load_state_dict(iwae_vimco_state_dict)
-            ax.plot(np.arange(num_mixtures), iwae_vimco.generative_network.get_z_params().data.numpy(), label='vimco', alpha=0.8)
+            ax.plot(np.arange(num_mixtures), iwae_vimco.generative_network.get_z_params().data.numpy(), label='vimco', alpha=0.8, color='C5')
+            # data.append(iwae_vimco.generative_network.get_z_params().data.numpy())
+            # labels.append('vimco')
 
             ### WW
             wws = []
@@ -145,7 +181,11 @@ def main():
                 ww_state_dict = torch.load(filename)
                 wws.append(RWS(p_init_mixture_probs_pre_softmax, init_mean_multiplier, init_log_stds))
                 wws[-1].load_state_dict(ww_state_dict)
-                ax.plot(np.arange(num_mixtures), wws[-1].generative_network.get_z_params().data.numpy(), label='ww {}'.format(ww_prob), alpha=0.8)
+                ax.plot(np.arange(num_mixtures), wws[-1].generative_network.get_z_params().data.numpy(), label='ww {}'.format(ww_prob), alpha=0.8, color='C{}'.format(ww_prob_idx + 6))
+                # data.append(wws[-1].generative_network.get_z_params().data.numpy())
+                # labels.append('ww {}'.format(ww_prob))
+
+            # ax = bar(ax, np.arange(num_mixtures), data, 0.95 / len(data), labels)
 
             # Plot the inference network
             for test_x_idx, test_x in enumerate(test_xs):
@@ -166,23 +206,46 @@ def main():
                 if iteration_idx == 0:
                     ax.set_title('$q_\phi(z | x = {0:.0f})$'.format(test_x_var.data[0]))
 
+                # data = []
+                # labels = []
+
                 ## True posterior
                 ax.plot(np.arange(num_mixtures), true_generative_network.posterior(test_x_var).data.numpy()[0], label='true', linewidth=matplotlib.rcParams['lines.linewidth'] * 1.5, color='black')
+                # data.append(true_generative_network.posterior(test_x_var).data.numpy()[0])
+                # labels.append('true')
 
                 ## Learned approximate posteriors
                 ### WS
-                ax.plot(np.arange(num_mixtures), ws.inference_network.get_z_params(test_x_var).data.numpy()[0], alpha=0.8)
+                ax.plot(np.arange(num_mixtures), ws.inference_network.get_z_params(test_x_var).data.numpy()[0], alpha=0.8, color='C1')
+                # data.append(ws.inference_network.get_z_params(test_x_var).data.numpy()[0])
+                # labels.append('ws')
 
                 ### Concrete
-                ax.plot(np.arange(num_mixtures), concrete.proposal.probs(test_x_var).data.numpy()[0], label='concrete', alpha=0.8)
+                ax.plot(np.arange(num_mixtures), concrete.proposal.probs(test_x_var).data.numpy()[0], label='concrete', alpha=0.8, color='C0')
+                # data.append(concrete.proposal.probs(test_x_var).data.numpy()[0])
+                # labels.append('concrete')
+
+                ### Relax
+                # if num_particles_idx == 0:
+                ax.plot(np.arange(num_mixtures), relax_inference_network.probs(test_x_var).data.numpy()[0], label='relax', alpha=0.8, color='C3')
+                # data.append(relax_inference_network.probs(test_x_var).data.numpy()[0])
+                # labels.append('relax')
 
                 ### VIMCO, Reinforce
-                ax.plot(np.arange(num_mixtures), iwae_reinforce.inference_network.get_z_params(test_x_var).data.numpy()[0], label='reinforce', alpha=0.8)
-                ax.plot(np.arange(num_mixtures), iwae_vimco.inference_network.get_z_params(test_x_var).data.numpy()[0], label='vimco', alpha=0.8)
+                ax.plot(np.arange(num_mixtures), iwae_reinforce.inference_network.get_z_params(test_x_var).data.numpy()[0], label='reinforce', alpha=0.8, color='C4')
+                # data.append(iwae_reinforce.inference_network.get_z_params(test_x_var).data.numpy()[0])
+                # labels.append('reinforce')
+                ax.plot(np.arange(num_mixtures), iwae_vimco.inference_network.get_z_params(test_x_var).data.numpy()[0], label='vimco', alpha=0.8, color='C5')
+                # data.append(iwae_vimco.inference_network.get_z_params(test_x_var).data.numpy()[0])
+                # labels.append('vimco')
 
                 ### WW
                 for ww_prob_idx, (ww, ww_prob) in enumerate(zip(wws, ww_probs)):
-                    ax.plot(np.arange(num_mixtures), ww.inference_network.get_z_params(test_x_var).data.numpy()[0], label='ww {}'.format(ww_prob), alpha=0.8)
+                    ax.plot(np.arange(num_mixtures), ww.inference_network.get_z_params(test_x_var).data.numpy()[0], label='ww {}'.format(ww_prob), alpha=0.8, color='C{}'.format(ww_prob_idx + 6))
+                    # data.append(ww.inference_network.get_z_params(test_x_var).data.numpy()[0])
+                    # labels.append('ww {}'.format(ww_prob))
+
+                # ax = bar(ax, np.arange(num_mixtures), data, 0.95 / len(data), labels)
 
     for num_particles_idx, num_particles in enumerate(num_particles_list):
         ax = axs[0, num_particles_idx * (num_test_x + 1) + (num_test_x + 1) // 2]
