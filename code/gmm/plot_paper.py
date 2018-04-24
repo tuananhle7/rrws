@@ -29,7 +29,7 @@ def main():
     uids = ['3319b6a9', '03ee5995', '179b8125', '871c4fce']
     concrete_uids = ['eaf03c8b', '7da5406d', '2c000794', '5b1962a9']
     reinforce_uids = ['9b28ea68', 'f6ebee25', 'e520c68c', '4c1be354']
-    relax_uids = ['23298d9c', '9de291f9', '54cfbdb8', 'bd1099fa']
+    relax_uids = ['e24618b3', 'a91304d3', 'a3dfe440', '3b3475dc']
     num_particles = [2, 5, 10, 20]
     ww_probs = [1.0, 0.8]
 
@@ -68,13 +68,13 @@ def main():
 
         # Relax
         # if ax_idx == 0:
-        relax = read_files('relax', relax_names, [1], relax_uid)
+        relax = read_files('relax', relax_names, seeds, relax_uid)
         kwargs = {'linestyle': '-', 'label': 'relax', 'color': 'C3'}
 
         for idx, name in enumerate(relax_names):
-            # plot_with_error_bars(logging_iterations, relax[name], axs[idx, ax_idx], **kwargs)
+            plot_with_error_bars(logging_iterations, relax[name], axs[idx, ax_idx], **kwargs)
             # print(relax[name][0])
-            axs[idx, ax_idx].plot(logging_iterations, relax[name][0], **kwargs)
+            # axs[idx, ax_idx].plot(logging_iterations, relax[name][0], **kwargs)
 
         ## IWAE
         # Reinforce
