@@ -65,21 +65,54 @@ class InferenceNetwork(nn.Module):
 
 
 class ControlVariate(nn.Module):
-    def __init__(self, num_mixtures):
+    def __init__(self, num_mixtures, mode='relax'):
         super(ControlVariate, self).__init__()
         self.num_mixtures = num_mixtures
-        self.mlp = nn.Sequential(
-            nn.Linear(num_mixtures + 1, 16),
-            nn.Tanh(),
-            nn.Linear(16, 16),
-            nn.Tanh(),
-            nn.Linear(16, 1)
-        )
+        self.mode = mode
+        if mode == 'relax' or mode == 'relaxed_rebar':
+            self.mlp = nn.Sequential(
+                nn.Linear(num_mixtures + 1, 16),
+                nn.Tanh(),
+                nn.Linear(16, 16),
+                nn.Tanh(),
+                nn.Linear(16, 1)
+            )
+        if mode == 'rebar' or mode == 'relaxed_rebar':
+            self.temperature = nn.Parameter(torch.tensor(1.0))
+        if mode == 'rebar':
+            self.multiplier = nn.Parameter(torch.tensor(1.0))
 
-    def forward(self, aux, observation):
-        return self.mlp(
-            torch.cat([observation.unsqueeze(-1), aux], dim=1)
-        ).squeeze(-1)
+    def forward(self, aux, observation, prior=None, likelihood=None, inference_network=None):
+        batch_size, num_particles, num_mixtures = aux.shape
+        observation_expanded = observation.unsqueeze(-1).expand(-1, num_particles)
+
+        if self.mode == 'relax' or self.mode == 'relaxed_rebar':
+            r = torch.mean(self.mlp(
+                torch.cat([
+                    observation_expanded.contiguous().view(-1).unsqueeze(-1),
+                    aux.view(-1, num_mixtures)
+                ], dim=1)
+            ).squeeze(-1).view(batch_size, num_particles), dim=1)
+
+        if self.mode == 'rebar' or self.mode == 'relaxed_rebar':
+            q_probs = inference_network.probs(observation_expanded.contiguous().view(-1)).view(
+                batch_size, num_particles, num_mixtures
+            ).detach()
+            latent = F.softmax(aux / self.temperature, dim=2)
+            prior_probs = prior.probs().unsqueeze(0).unsqueeze(0).expand(
+                batch_size, num_particles, num_mixtures
+            ).detach()
+            relaxed_logweight = torch.sum(torch.log(prior_probs) + torch.log(latent), dim=-1) + \
+                likelihood(latent).log_prob(observation_expanded) - \
+                torch.sum(torch.log(q_probs) + torch.log(latent), dim=-1)
+            relaxed_log_evidence = logsumexp(relaxed_logweight, dim=1) - np.log(num_particles)
+
+        if self.mode == 'rebar':
+            return self.multiplier * relaxed_log_evidence
+        elif self.mode == 'relaxed_rebar':
+            return relaxed_log_evidence + r
+        elif self.mode == 'relax':
+            return r
 
 
 # This implements Appendix C in the REBAR paper
@@ -132,13 +165,8 @@ def elbo_relax(prior, likelihood, inference_network, control_variate,
         likelihood(latent).log_prob(observation_expanded) - \
         log_inf
     log_evidence = logsumexp(logweight, dim=1) - np.log(num_particles)
-    c, c_tilde = [
-        torch.mean(control_variate(
-            aux.view(-1, num_mixtures),
-            observation_expanded.contiguous().view(-1)
-        ).contiguous().view(batch_size, num_particles), dim=1)
-        for aux in [latent_aux, latent_aux_tilde]
-    ]
+    c, c_tilde = [control_variate(aux, observation, prior, likelihood, inference_network)
+                  for aux in [latent_aux, latent_aux_tilde]]
     return (log_evidence - c_tilde).detach() * torch.sum(log_inf, dim=1) + \
         c - c_tilde + log_evidence
 
@@ -370,7 +398,7 @@ def main(args, uid):
             torch.cuda.manual_seed(seed)
 
         inference_network = InferenceNetwork(num_mixtures)
-        control_variate = ControlVariate(num_mixtures)
+        control_variate = ControlVariate(num_mixtures, args.mode)
         training_stats = TrainingStats(
             saving_interval=saving_interval,
             logging_interval=logging_interval,
@@ -414,6 +442,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='GMM')
     parser.add_argument('--cuda', action='store_true', default=False,
                         help='enables CUDA use')
+    parser.add_argument('--mode', default='relaxed_rebar')
     parser.add_argument('--num-mixtures', type=int, default=20)
     parser.add_argument('--num-particles', type=int, default=2)
     parser.add_argument('--num-iterations', type=int, default=100000)
