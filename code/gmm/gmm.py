@@ -1,6 +1,8 @@
 from collections import OrderedDict
 from torch.autograd import Variable
 
+import sga
+import itertools
 import util
 from util import logsumexp, lognormexp, OnlineMeanStd
 import uuid
@@ -17,6 +19,8 @@ rws_theta_optim = torch.optim.Adam
 rws_phi_optim = torch.optim.Adam
 rws_theta_optim_params = {'lr': 1e-3}
 rws_phi_optim_params = {'lr': 1e-3}
+sga_optim = torch.optim.Adam
+sga_optim_params = {'lr': 1e-3}
 softmax_multiplier = 0.5
 
 
@@ -363,10 +367,10 @@ class RWS(nn.Module):
 
 def train_rws(
     p_init_mixture_probs_pre_softmax, init_mean_multiplier, init_log_stds,
-    true_p_mixture_probs, true_mean_multiplier, true_log_stds, test_x,
-    mode,
+    true_p_mixture_probs, true_mean_multiplier, true_log_stds, test_x, mode,
     num_iterations, num_samples, num_particles, num_mc_samples,
-    logging_interval, saving_interval, q_mixture_prob=1, seed=1
+    logging_interval, saving_interval, q_mixture_prob=1, seed=1,
+    train_sga=False
 ):
     log_evidence_history = []
     posterior_norm_history = []
@@ -385,53 +389,83 @@ def train_rws(
 
     set_seed(seed)
     rws = RWS(p_init_mixture_probs_pre_softmax, init_mean_multiplier, init_log_stds) # true_generative_network)
-    theta_optimizer = rws_theta_optim(rws.generative_network.parameters(), **rws_theta_optim_params)
-    phi_optimizer = rws_phi_optim(rws.inference_network.parameters(), **rws_phi_optim_params)
+    if train_sga:
+        num_theta_param_tensors = len(
+            list(rws.generative_network.parameters()))
+        num_phi_param_tensors = len(list(rws.inference_network.parameters()))
+        params = [param for param in rws.generative_network.parameters()] + \
+            [param for param in rws.inference_network.parameters()]
+        optimizer = sga_optim(params, **sga_optim_params)
+    else:
+        theta_optimizer = rws_theta_optim(rws.generative_network.parameters(), **rws_theta_optim_params)
+        phi_optimizer = rws_phi_optim(rws.inference_network.parameters(), **rws_phi_optim_params)
 
     for i in range(num_iterations):
         x = generate_obs(num_samples, true_generative_network)
 
-        # Wake theta
-        theta_optimizer.zero_grad()
-        loss = rws('wake_theta', x=x, num_particles=num_particles)
-        loss.backward()
-        theta_optimizer.step()
+        if train_sga:
+            loss_theta = rws('wake_theta', x=x, num_particles=num_particles)
+            if mode == 'ws':
+                loss_phi = rws('sleep_phi', num_samples=num_samples) # TODO: change to num_particles
+            elif mode == 'ww':
+                loss_phi = rws('wake_phi', x=x, num_particles=num_particles,
+                               q_mixture_prob=q_mixture_prob)
 
-        # Phi update
-        if mode == 'ws':
-            phi_optimizer.zero_grad()
-            loss = rws('sleep_phi', num_samples=num_samples)
-            loss.backward()
-            phi_optimizer.step()
-        elif mode == 'ww':
-            phi_optimizer.zero_grad()
-            loss = rws('wake_phi', x=x, num_particles=num_particles, q_mixture_prob=q_mixture_prob)
-            loss.backward()
-            phi_optimizer.step()
-        elif mode == 'wsw':
-            phi_optimizer.zero_grad()
-            loss = 0.5 * rws('sleep_phi', num_samples=num_samples) + 0.5 * rws('wake_phi', x=x, num_particles=num_particles, q_mixture_prob=q_mixture_prob)
-            loss.backward()
-            phi_optimizer.step()
-        elif mode == 'wswa':
-            phi_optimizer.zero_grad()
-            s_loss = rws('sleep_phi', num_samples=num_samples)
-            w_loss = rws('wake_phi', x=x, num_particles=num_particles, q_mixture_prob=q_mixture_prob)
-            d = torch.abs(s_loss - w_loss)
-            alpha = 1 - d.neg().exp().item()
-            loss = alpha * w_loss + (1 - alpha) * s_loss
-            loss.backward()
-            phi_optimizer.step()
+            losses = [loss_theta for _ in range(num_theta_param_tensors)] + \
+                [loss_phi for _ in range(num_phi_param_tensors)]
+            sga_grads = sga.sga(losses, params)
+            sga.optimizer_step(optimizer, params, sga_grads)
         else:
-            raise AttributeError('Mode must be one of ws, ww, wsw. Got: {}'.format(mode))
+            # Wake theta
+            theta_optimizer.zero_grad()
+            loss = rws('wake_theta', x=x, num_particles=num_particles)
+            loss.backward()
+            theta_optimizer.step()
+
+            # Phi update
+            if mode == 'ws':
+                phi_optimizer.zero_grad()
+                loss = rws('sleep_phi', num_samples=num_samples) # TODO: change to num_particles
+                loss.backward()
+                phi_optimizer.step()
+            elif mode == 'ww':
+                phi_optimizer.zero_grad()
+                loss = rws('wake_phi', x=x, num_particles=num_particles,
+                           q_mixture_prob=q_mixture_prob)
+                loss.backward()
+                phi_optimizer.step()
+            elif mode == 'wsw':
+                phi_optimizer.zero_grad()
+                loss = 0.5 * rws('sleep_phi', num_samples=num_samples) + \
+                    0.5 * rws('wake_phi', x=x, num_particles=num_particles,
+                              q_mixture_prob=q_mixture_prob)
+                loss.backward()
+                phi_optimizer.step()
+            elif mode == 'wswa':
+                phi_optimizer.zero_grad()
+                s_loss = rws('sleep_phi', num_samples=num_samples)
+                w_loss = rws('wake_phi', x=x, num_particles=num_particles,
+                             q_mixture_prob=q_mixture_prob)
+                d = torch.abs(s_loss - w_loss)
+                alpha = 1 - d.neg().exp().item()
+                loss = alpha * w_loss + (1 - alpha) * s_loss
+                loss.backward()
+                phi_optimizer.step()
+            else:
+                raise AttributeError(
+                    'Mode must be one of ws, ww, wsw. Got: {}'.format(mode))
 
         if i % saving_interval == 0:
             if mode == 'ww':
-                filename = safe_fname('{}{}_{}_{}'.format(mode, str(q_mixture_prob).replace('.', '-'), i, seed), 'pt')
+                filename = safe_fname('{}{}{}_{}_{}'.format(
+                    mode, str(q_mixture_prob).replace('.', '-'),
+                    '_sga' if train_sga else '', i, seed), 'pt')
             else:
-                filename = safe_fname('{}_{}_{}'.format(mode, i, seed), 'pt')
+                filename = safe_fname('{}{}_{}_{}'.format(
+                    mode, '_sga' if train_sga else '', i, seed), 'pt')
             torch.save(
-                OrderedDict((name, tensor.cpu()) for name, tensor in rws.state_dict().items()),
+                OrderedDict((name, tensor.cpu())
+                            for name, tensor in rws.state_dict().items()),
                 filename
             )
             print('Saved to {}'.format(filename))
@@ -590,6 +624,7 @@ def main(args):
                  for filename in iwae_filenames])
 
         # RWS
+        sga_prefix = '_sga' if args.sga else ''
         rws_filenames = [
             'log_evidence_history', 'posterior_norm_history',
             'true_posterior_norm_history', 'p_mixture_probs_norm_history',
@@ -604,10 +639,10 @@ def main(args):
                 init_log_stds, true_p_mixture_probs, true_mean_multiplier,
                 true_log_stds, test_x, mode, num_iterations, num_samples,
                 num_particles, num_mc_samples, logging_interval,
-                saving_interval, seed=seed
+                saving_interval, seed=seed, train_sga=args.sga
             ))
             util.save_np_arrays(train_stats, [
-                safe_fname('{}_{}_{}'.format(mode, filename, seed), 'npy')
+                safe_fname('{}{}_{}_{}'.format(mode, sga_prefix, filename, seed), 'npy')
                 for filename in rws_filenames])
 
         ## WW
@@ -619,12 +654,14 @@ def main(args):
                     init_log_stds, true_p_mixture_probs, true_mean_multiplier,
                     true_log_stds, test_x, mode, num_iterations, num_samples,
                     num_particles, num_mc_samples, logging_interval,
-                    saving_interval, q_mixture_prob, seed=seed
+                    saving_interval, q_mixture_prob, seed=seed,
+                    train_sga=args.sga
                 ))
                 util.save_np_arrays(train_stats, [
-                    safe_fname('{}_{}_{}_{}'.format(
+                    safe_fname('{}{}{}_{}_{}'.format(
                         mode,
                         str(q_mixture_prob).replace('.', '-'),
+                        sga_prefix,
                         filename,
                         seed
                     ), 'npy') for filename in rws_filenames
@@ -638,10 +675,10 @@ def main(args):
                 init_log_stds, true_p_mixture_probs, true_mean_multiplier,
                 true_log_stds, test_x, mode, num_iterations, num_samples,
                 num_particles, num_mc_samples, logging_interval,
-                saving_interval, seed=seed
+                saving_interval, seed=seed, train_sga=args.sga
             ))
             util.save_np_arrays(train_stats,
-                [safe_fname('{}_{}_{}'.format(mode, filename, seed), 'npy')
+                [safe_fname('{}{}_{}_{}'.format(mode, sga_prefix, filename, seed), 'npy')
                  for filename in rws_filenames])
 
         ## WSWA
@@ -652,10 +689,10 @@ def main(args):
                 init_log_stds, true_p_mixture_probs, true_mean_multiplier,
                 true_log_stds, test_x, mode, num_iterations, num_samples,
                 num_particles, num_mc_samples, logging_interval,
-                saving_interval, seed=seed
+                saving_interval, seed=seed, train_sga=args.sga
             ))
             util.save_np_arrays(train_stats, [
-                safe_fname('{}_{}_{}'.format(mode, filename, seed), 'npy')
+                safe_fname('{}{}_{}_{}'.format(mode, sga_prefix, filename, seed), 'npy')
                 for filename in rws_filenames])
 
 
@@ -696,6 +733,7 @@ if __name__ == '__main__':
     parser.add_argument('--ww-probs', nargs='*', type=float, default=[1.0])
     parser.add_argument('--wsw', action='store_true', default=False)
     parser.add_argument('--wswa', action='store_true', default=False)
+    parser.add_argument('--sga', action='store_true', default=False)
     args = parser.parse_args()
     args.cuda = args.cuda and torch.cuda.is_available()
     CUDA = args.cuda
