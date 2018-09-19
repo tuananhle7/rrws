@@ -63,6 +63,17 @@ def main(args):
         for idx, filename in enumerate(concrete_filenames):
             plot_with_error_bars(saving_iterations, concrete[filename], axs[idx], **kwargs)
 
+    relax_filenames = concrete_filenames
+    if args.all or args.relax:
+        relax = read_files('relax', relax_filenames, args.seeds, args.uid)
+        kwargs = {'linestyle': '-', 'label': 'relax'}
+
+        # print(relax)
+        # print(saving_iterations)
+
+        for idx, filename in enumerate(relax_filenames):
+            plot_with_error_bars(saving_iterations, relax[filename], axs[idx], **kwargs)
+
     ## RWS
     rws_filenames = ['p_mixture_probs_norm_history', 'posterior_norm_history', 'true_posterior_norm_history', 'q_grad_std_history']
 
@@ -150,6 +161,7 @@ if __name__ == '__main__':
     parser.add_argument('--reinforce', action='store_true', default=False)
     parser.add_argument('--vimco', action='store_true', default=False)
     parser.add_argument('--concrete', action='store_true', default=False)
+    parser.add_argument('--relax', action='store_true', default=False)
     parser.add_argument('--ws', action='store_true', default=False)
     parser.add_argument('--ww', action='store_true', default=False)
     parser.add_argument('--ww-probs', nargs='*', type=float, default=[1.0])

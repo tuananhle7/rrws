@@ -11,17 +11,22 @@ BIGGER_SIZE = 11
 plt.switch_backend('agg')
 plt.rc('font', size=SMALL_SIZE)          # controls default text sizes
 plt.rc('axes', titlesize=SMALL_SIZE)     # fontsize of the axes title
-plt.rc('axes', labelsize=SMALL_SIZE)    # fontsize of the x and y labels
+plt.rc('axes', labelsize=SMALL_SIZE)     # fontsize of the x and y labels
 plt.rc('xtick', labelsize=SMALL_SIZE)    # fontsize of the tick labels
 plt.rc('ytick', labelsize=SMALL_SIZE)    # fontsize of the tick labels
 plt.rc('legend', fontsize=SMALL_SIZE)    # legend fontsize
 plt.rc('figure', titlesize=BIGGER_SIZE)  # fontsize of the figure title
 plt.rc('axes', linewidth=0.5)            # set the value globally
-plt.rc('xtick.major', width=0.5)            # set the value globally
-plt.rc('ytick.major', width=0.5)            # set the value globally
-plt.rc('lines', linewidth=1)           # line thickness
+plt.rc('xtick.major', width=0.5)         # set the value globally
+plt.rc('ytick.major', width=0.5)         # set the value globally
+plt.rc('lines', linewidth=1)             # line thickness
 plt.rc('ytick.major', size=2)            # set the value globally
 plt.rc('xtick.major', size=2)            # set the value globally
+plt.rc('text', usetex=True)
+plt.rc('text.latex',
+       preamble=[r'\usepackage{amsmath}',
+                 r'\usepackage[cm]{sfmath}'])  # for \text command
+plt.rc('font', **{'family': 'sans-serif', 'sans-serif': ['cm']})
 
 
 def main():
@@ -39,7 +44,7 @@ def main():
 
     # Plotting
     fig, axs = plt.subplots(3, len(uids), sharex=True, sharey='row')
-    fig.set_size_inches(5.5, 3.5)
+    fig.set_size_inches(5.5, 3)
 
     for ax_idx in range(len(uids)):
         uid = uids[ax_idx]
@@ -52,16 +57,9 @@ def main():
         concrete_names = ['prior_l2_history', 'true_posterior_l2_history', 'inference_network_grad_phi_std_history']
         relax_names = concrete_names
 
-        # WS
-        ws = read_files('ws', rws_filenames , seeds, uid)
-        kwargs = {'linestyle': '-', 'label': 'ws', 'color': 'C1'}
-
-        for idx, filename in enumerate(iwae_filenames):
-            plot_with_error_bars(logging_iterations, ws[filename], axs[idx, ax_idx], **kwargs)
-
         # Concrete
         concrete = read_files('concrete', concrete_names, seeds, concrete_uid)
-        kwargs = {'linestyle': '-', 'label': 'concrete', 'color': 'C0'}
+        kwargs = {'linestyle': '--', 'label': 'Concrete', 'color': 'C0'}
 
         for idx, name in enumerate(concrete_names):
             plot_with_error_bars(logging_iterations, concrete[name], axs[idx, ax_idx], **kwargs)
@@ -69,7 +67,7 @@ def main():
         # Relax
         # if ax_idx == 0:
         relax = read_files('relax', relax_names, seeds, relax_uid)
-        kwargs = {'linestyle': '-', 'label': 'relax', 'color': 'C3'}
+        kwargs = {'linestyle': '--', 'label': 'RELAX', 'color': 'C3'}
 
         for idx, name in enumerate(relax_names):
             plot_with_error_bars(logging_iterations, relax[name], axs[idx, ax_idx], **kwargs)
@@ -79,23 +77,29 @@ def main():
         ## IWAE
         # Reinforce
         iwae_reinforce = read_files('iwae_reinforce', iwae_filenames, seeds, reinforce_uid)
-        kwargs = {'linestyle': '-', 'label': 'reinforce', 'color': 'C4'}
+        kwargs = {'linestyle': '--', 'label': 'REINFORCE', 'color': 'C4'}
 
         for idx, filename in enumerate(iwae_filenames):
             plot_with_error_bars(logging_iterations, iwae_reinforce[filename], axs[idx, ax_idx], **kwargs)
 
         # VIMCO
         iwae_vimco = read_files('iwae_vimco', iwae_filenames, seeds, uid)
-        kwargs = {'linestyle': '-', 'label': 'vimco', 'color': 'C5'}
+        kwargs = {'linestyle': '--', 'label': 'VIMCO', 'color': 'C5'}
 
         for idx, filename in enumerate(iwae_filenames):
             plot_with_error_bars(logging_iterations, iwae_vimco[filename], axs[idx, ax_idx], **kwargs)
 
+        # WS
+        ws = read_files('ws', rws_filenames , seeds, uid)
+        kwargs = {'linestyle': '-', 'label': 'WS', 'color': 'C1'}
+
+        for idx, filename in enumerate(rws_filenames):
+            plot_with_error_bars(logging_iterations, ws[filename], axs[idx, ax_idx], **kwargs)
 
         # WW
         for q_mixture_prob_idx, q_mixture_prob in enumerate(ww_probs):
             ww = read_files('ww_{}'.format(str(q_mixture_prob).replace('.', '-')), rws_filenames, seeds, uid)
-            kwargs = {'linestyle': '-', 'label': 'ww {}'.format(q_mixture_prob), 'color': 'C{}'.format(q_mixture_prob_idx + 6)}
+            kwargs = {'linestyle': '-', 'label': '{}'.format('WW' if q_mixture_prob == 1 else r'$\delta$-WW'), 'color': 'C{}'.format(q_mixture_prob_idx + 6)}
 
             for idx, filename in enumerate(iwae_filenames):
                 plot_with_error_bars(logging_iterations, ww[filename], axs[idx, ax_idx], **kwargs)
@@ -103,10 +107,10 @@ def main():
 
 
     axs[0, 0].set_yscale('log')
-    axs[0, 0].set_ylabel('$|| p_{\\theta}(z) - p_{\\theta_{true}}(z) ||$')
+    axs[0, 0].set_ylabel(r'$\| p_{\theta}(z) - p_{\theta_{\text{true}}}(z) \|$')
 
     axs[1, 0].set_yscale('log')
-    axs[1, 0].set_ylabel('Avg. test\n$|| q_\phi(z | x) - p_{\\theta_{true}}(z | x) ||$')
+    axs[1, 0].set_ylabel('Avg. test\n' + r'$\| q_\phi(z | x) - p_{\theta_{\text{true}}}(z | x) \|$')
 
     axs[2, 0].set_yscale('log')
     axs[2, 0].set_ylabel('Std. of $\phi$ \n gradient est.')

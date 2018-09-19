@@ -21,22 +21,30 @@ plt.rc('ytick', labelsize=SMALL_SIZE)    # fontsize of the tick labels
 plt.rc('legend', fontsize=SMALL_SIZE)    # legend fontsize
 plt.rc('figure', titlesize=BIGGER_SIZE)  # fontsize of the figure title
 plt.rc('axes', linewidth=0.5)            # set the value globally
-plt.rc('lines', linewidth=1)           # line thickness
+plt.rc('lines', linewidth=0.7)           # line thickness
 plt.rc('xtick.major', width=0.5)            # set the value globally
 plt.rc('ytick.major', width=0.5)            # set the value globally
 plt.rc('ytick.major', size=2)            # set the value globally
 plt.rc('xtick.major', size=0)            # set the value globally
+plt.rc('text', usetex=True)
+plt.rc('text.latex',
+       preamble=[r'\usepackage{amsmath}',
+                 r'\usepackage[cm]{sfmath}'])
+plt.rc('font', **{'family': 'sans-serif', 'sans-serif': ['cm']})
+plt.rc('axes', titlepad=3)
 
 
-def bar(ax, x, data, width, labels, **kwargs):
+def bar(ax, x, data, width, labels, colors, **kwargs):
     num_data = len(data)
     group_width = num_data * width
-    for idx, (height, label) in enumerate(zip(data, labels)):
-        ax.bar(x - group_width / 2 + idx * width, height, width, label=label, align='edge', **kwargs)
+    for idx, (height, label, color) in enumerate(zip(data, labels, colors)):
+        ax.bar(x - group_width / 2 + idx * width, height, width, label=label, align='edge', color=color, **kwargs)
     return ax
 
 
 def main():
+    plot_bars = False
+    bar_colors = ['black', 'C0', 'C3', 'C4', 'C5', 'C1', 'C6', 'C7']
     seeds = np.arange(1, 11, dtype=int)
     # uids = ['3319b6a9', '03ee5995', '179b8125', '871c4fce']
     # concrete_uids = ['eaf03c8b', '7da5406d', '2c000794', '5b1962a9']
@@ -50,6 +58,8 @@ def main():
     rws_filenames = ['p_mixture_probs_norm_history', 'true_posterior_norm_history', 'q_grad_std_history']
     concrete_names = ['prior_l2_history', 'true_posterior_l2_history', 'inference_network_grad_phi_std_history']
     relax_names = concrete_names
+
+    iwae_linestyle = '--'
 
     # num_particles_list = [2, 5, 10, 20]
     num_particles_list = [2, 20]
@@ -103,29 +113,25 @@ def main():
             ax.set_ylim(-0.05, 1.05)
             ax.set_xlim(-0.5, 19.5)
             if iteration_idx == 0:
-                ax.set_title('$p_\\theta(z)$')
+                ax.set_title(r'$p_\theta(z)$')
 
             # ax.spines['bottom'].set_visible(False)
             # ax.spines['left'].set_visible(False)
             # ax.tick_params(bottom="off", left="off")
 
-            # data = []
-            # labels = []
+            if plot_bars:
+                data = []
+                labels = []
             ## True generative network
-            ax.plot(np.arange(num_mixtures), true_generative_network.get_z_params().data.numpy(), label='true', linewidth=matplotlib.rcParams['lines.linewidth'] * 1.5, color='black')
-            # data.append(true_generative_network.get_z_params().data.numpy())
-            # labels.append('true')
+            if plot_bars:
+                data.append(true_generative_network.get_z_params().data.numpy())
+                labels.append('true')
+            else:
+                ax.step(np.arange(num_mixtures), true_generative_network.get_z_params().data.numpy(), label='true', linewidth=matplotlib.rcParams['lines.linewidth'] * 1.5, color='black')
+                # ax.plot(np.arange(num_mixtures), true_generative_network.get_z_params().data.numpy(), label='true', linewidth=matplotlib.rcParams['lines.linewidth'] * 0.5, color='black')
+                # ax.scatter(np.arange(num_mixtures), true_generative_network.get_z_params().data.numpy(), s=1, label='true', color='black')
 
             ## Learned generative network
-            ### WS
-            filename='{}/ws_{}_{}_{}.pt'.format(WORKING_DIR, iteration, seeds[0], uids[num_particles_idx])
-            ws_state_dict = torch.load(filename)
-            ws = RWS(p_init_mixture_probs_pre_softmax, init_mean_multiplier, init_log_stds)
-            ws.load_state_dict(ws_state_dict)
-            ax.plot(np.arange(num_mixtures), ws.generative_network.get_z_params().data.numpy(), label='ws', alpha=0.8, color='C1')
-            # data.append(ws.generative_network.get_z_params().data.numpy())
-            # labels.append('ws')
-
             ### Concrete
             filename = '{}/concrete_{}_{}_{}.pt'.format(WORKING_DIR, iteration, seeds[0], concrete_uids[num_particles_idx])
             concrete_state_dict = torch.load(filename)
@@ -141,9 +147,12 @@ def main():
                 )
             )
             concrete.load_state_dict(concrete_state_dict)
-            ax.plot(np.arange(num_mixtures), concrete.initial.probs().data.numpy(), label='concrete', alpha=0.8, color='C0')
-            # data.append(concrete.initial.probs().data.numpy())
-            # labels.append('concrete')
+            if plot_bars:
+                data.append(concrete.initial.probs().data.numpy())
+                labels.append('concrete')
+            else:
+                ax.step(np.arange(num_mixtures), concrete.initial.probs().data.numpy(), label='Concrete', alpha=0.7, color='C0', linestyle=iwae_linestyle, dashes=(7, 0.8))
+                # ax.scatter(np.arange(num_mixtures), concrete.initial.probs().data.numpy(), s=0.5, label='Concrete', color='C0')
 
             ### Relax
             # if num_particles_idx == 0:
@@ -153,26 +162,47 @@ def main():
             relax_inference_network = gmm_relax.InferenceNetwork(num_mixtures)
             relax_prior.load_state_dict(relax_state_dict['prior'])
             relax_inference_network.load_state_dict(relax_state_dict['inference_network'])
-            ax.plot(np.arange(num_mixtures), relax_prior.probs().data.numpy(), label='relax', alpha=0.8, color='C3')
-            # data.append(relax_prior.probs().data.numpy())
-            # labels.append('relax')
+            if plot_bars:
+                data.append(relax_prior.probs().data.numpy())
+                labels.append('relax')
+            else:
+                ax.step(np.arange(num_mixtures), relax_prior.probs().data.numpy(), label='RELAX', alpha=0.7, color='C3', linestyle=iwae_linestyle, dashes=(7, 0.8))
+                # ax.scatter(np.arange(num_mixtures), relax_prior.probs().data.numpy(), s=0.5, label='RELAX', color='C3')
 
             ### VIMCO, Reinforce
             filename = '{}/reinforce_{}_{}_{}.pt'.format(WORKING_DIR, iteration, seeds[0], reinforce_uids[num_particles_idx])
             iwae_reinforce_state_dict = torch.load(filename)
             iwae_reinforce = IWAE(p_init_mixture_probs_pre_softmax, init_mean_multiplier, init_log_stds)
             iwae_reinforce.load_state_dict(iwae_reinforce_state_dict)
-            ax.plot(np.arange(num_mixtures), iwae_reinforce.generative_network.get_z_params().data.numpy(), label='reinforce', alpha=0.8, color='C4')
-            # data.append(iwae_reinforce.generative_network.get_z_params().data.numpy())
-            # labels.append('reinforce')
+            if plot_bars:
+                data.append(iwae_reinforce.generative_network.get_z_params().data.numpy())
+                labels.append('reinforce')
+            else:
+                ax.step(np.arange(num_mixtures), iwae_reinforce.generative_network.get_z_params().data.numpy(), label='REINFORCE', alpha=0.7, color='C4', linestyle=iwae_linestyle, dashes=(7, 0.8))
+                # ax.scatter(np.arange(num_mixtures), iwae_reinforce.generative_network.get_z_params().data.numpy(), s=0.5, label='REINFORCE', color='C4')
 
             filename = '{}/vimco_{}_{}_{}.pt'.format(WORKING_DIR, iteration, seeds[0], uids[num_particles_idx])
             iwae_vimco_state_dict = torch.load(filename)
             iwae_vimco = IWAE(p_init_mixture_probs_pre_softmax, init_mean_multiplier, init_log_stds)
             iwae_vimco.load_state_dict(iwae_vimco_state_dict)
-            ax.plot(np.arange(num_mixtures), iwae_vimco.generative_network.get_z_params().data.numpy(), label='vimco', alpha=0.8, color='C5')
-            # data.append(iwae_vimco.generative_network.get_z_params().data.numpy())
-            # labels.append('vimco')
+            if plot_bars:
+                data.append(iwae_vimco.generative_network.get_z_params().data.numpy())
+                labels.append('vimco')
+            else:
+                ax.step(np.arange(num_mixtures), iwae_vimco.generative_network.get_z_params().data.numpy(), label='VIMCO', alpha=0.7, color='C5', linestyle=iwae_linestyle, dashes=(7, 0.8))
+                # ax.scatter(np.arange(num_mixtures), iwae_vimco.generative_network.get_z_params().data.numpy(), s=0.5, label='VIMCO', color='C5')
+
+            ### WS
+            filename='{}/ws_{}_{}_{}.pt'.format(WORKING_DIR, iteration, seeds[0], uids[num_particles_idx])
+            ws_state_dict = torch.load(filename)
+            ws = RWS(p_init_mixture_probs_pre_softmax, init_mean_multiplier, init_log_stds)
+            ws.load_state_dict(ws_state_dict)
+            if plot_bars:
+                data.append(ws.generative_network.get_z_params().data.numpy())
+                labels.append('ws')
+            else:
+                ax.step(np.arange(num_mixtures), ws.generative_network.get_z_params().data.numpy(), label='WS', alpha=0.7, color='C1')
+                # ax.scatter(np.arange(num_mixtures), ws.generative_network.get_z_params().data.numpy(), s=0.5, label='WS', color='C1')
 
             ### WW
             wws = []
@@ -181,11 +211,15 @@ def main():
                 ww_state_dict = torch.load(filename)
                 wws.append(RWS(p_init_mixture_probs_pre_softmax, init_mean_multiplier, init_log_stds))
                 wws[-1].load_state_dict(ww_state_dict)
-                ax.plot(np.arange(num_mixtures), wws[-1].generative_network.get_z_params().data.numpy(), label='ww {}'.format(ww_prob), alpha=0.8, color='C{}'.format(ww_prob_idx + 6))
-                # data.append(wws[-1].generative_network.get_z_params().data.numpy())
-                # labels.append('ww {}'.format(ww_prob))
+                if plot_bars:
+                    data.append(wws[-1].generative_network.get_z_params().data.numpy())
+                    labels.append('ww {}'.format(ww_prob))
+                else:
+                    ax.step(np.arange(num_mixtures), wws[-1].generative_network.get_z_params().data.numpy(), label='{}'.format('WW' if ww_prob == 1 else r'$\delta$-WW'), alpha=0.7, color='C{}'.format(ww_prob_idx + 6))
+                    # ax.scatter(np.arange(num_mixtures), wws[-1].generative_network.get_z_params().data.numpy(), s=0.5, label='WW {}'.format('' if ww_prob == 1 else ww_prob), color='C{}'.format(ww_prob_idx + 6))
 
-            # ax = bar(ax, np.arange(num_mixtures), data, 0.95 / len(data), labels)
+            if plot_bars:
+                ax = bar(ax, np.arange(num_mixtures), data, 0.95 / len(data), labels, colors=bar_colors)
 
             # Plot the inference network
             for test_x_idx, test_x in enumerate(test_xs):
@@ -204,52 +238,77 @@ def main():
                 # ax.tick_params(bottom="off", left="off")
                 test_x_var = Variable(torch.Tensor([test_x]))
                 if iteration_idx == 0:
-                    ax.set_title('$q_\phi(z | x = {0:.0f})$'.format(test_x_var.data[0]))
+                    ax.set_title(r'$q_\phi(z | x = {0:.0f})$'.format(test_x_var.data[0]))
 
-                # data = []
-                # labels = []
+                if plot_bars:
+                    data = []
+                    labels = []
 
                 ## True posterior
-                ax.plot(np.arange(num_mixtures), true_generative_network.posterior(test_x_var).data.numpy()[0], label='true', linewidth=matplotlib.rcParams['lines.linewidth'] * 1.5, color='black')
-                # data.append(true_generative_network.posterior(test_x_var).data.numpy()[0])
-                # labels.append('true')
+                if plot_bars:
+                    data.append(true_generative_network.posterior(test_x_var).data.numpy()[0])
+                    labels.append('true')
+                else:
+                    ax.step(np.arange(num_mixtures), true_generative_network.posterior(test_x_var).data.numpy()[0], label='true', linewidth=matplotlib.rcParams['lines.linewidth'] * 1.5, color='black')
+                    # ax.plot(np.arange(num_mixtures), true_generative_network.posterior(test_x_var).data.numpy()[0], label='true', linewidth=matplotlib.rcParams['lines.linewidth'] * 0.5, color='black')
+                    # ax.scatter(np.arange(num_mixtures), true_generative_network.posterior(test_x_var).data.numpy()[0], s=1, label='true', color='black')
 
                 ## Learned approximate posteriors
-                ### WS
-                ax.plot(np.arange(num_mixtures), ws.inference_network.get_z_params(test_x_var).data.numpy()[0], alpha=0.8, color='C1')
-                # data.append(ws.inference_network.get_z_params(test_x_var).data.numpy()[0])
-                # labels.append('ws')
-
                 ### Concrete
-                ax.plot(np.arange(num_mixtures), concrete.proposal.probs(test_x_var).data.numpy()[0], label='concrete', alpha=0.8, color='C0')
-                # data.append(concrete.proposal.probs(test_x_var).data.numpy()[0])
-                # labels.append('concrete')
+                if plot_bars:
+                    data.append(concrete.proposal.probs(test_x_var).data.numpy()[0])
+                    labels.append('concrete')
+                else:
+                    ax.step(np.arange(num_mixtures), concrete.proposal.probs(test_x_var).data.numpy()[0], label='Concrete', alpha=0.7, color='C0', linestyle=iwae_linestyle, dashes=(7, 0.8))
+                    # ax.scatter(np.arange(num_mixtures), concrete.proposal.probs(test_x_var).data.numpy()[0], s=0.5, label='Concrete', color='C0')
 
                 ### Relax
                 # if num_particles_idx == 0:
-                ax.plot(np.arange(num_mixtures), relax_inference_network.probs(test_x_var).data.numpy()[0], label='relax', alpha=0.8, color='C3')
-                # data.append(relax_inference_network.probs(test_x_var).data.numpy()[0])
-                # labels.append('relax')
+                if plot_bars:
+                    data.append(relax_inference_network.probs(test_x_var).data.numpy()[0])
+                    labels.append('relax')
+                else:
+                    ax.step(np.arange(num_mixtures), relax_inference_network.probs(test_x_var).data.numpy()[0], label='RELAX', alpha=0.7, color='C3', linestyle=iwae_linestyle, dashes=(7, 0.8))
+                    # ax.scatter(np.arange(num_mixtures), relax_inference_network.probs(test_x_var).data.numpy()[0], s=0.5, label='RELAX', color='C3')
 
                 ### VIMCO, Reinforce
-                ax.plot(np.arange(num_mixtures), iwae_reinforce.inference_network.get_z_params(test_x_var).data.numpy()[0], label='reinforce', alpha=0.8, color='C4')
-                # data.append(iwae_reinforce.inference_network.get_z_params(test_x_var).data.numpy()[0])
-                # labels.append('reinforce')
-                ax.plot(np.arange(num_mixtures), iwae_vimco.inference_network.get_z_params(test_x_var).data.numpy()[0], label='vimco', alpha=0.8, color='C5')
-                # data.append(iwae_vimco.inference_network.get_z_params(test_x_var).data.numpy()[0])
-                # labels.append('vimco')
+                if plot_bars:
+                    data.append(iwae_reinforce.inference_network.get_z_params(test_x_var).data.numpy()[0])
+                    labels.append('reinforce')
+                else:
+                    ax.step(np.arange(num_mixtures), iwae_reinforce.inference_network.get_z_params(test_x_var).data.numpy()[0], label='REINFORCE', alpha=0.7, color='C4', linestyle=iwae_linestyle, dashes=(7, 0.8))
+                    # ax.scatter(np.arange(num_mixtures), iwae_reinforce.inference_network.get_z_params(test_x_var).data.numpy()[0], s=0.5, label='REINFORCE', color='C4')
+
+                if plot_bars:
+                    data.append(iwae_vimco.inference_network.get_z_params(test_x_var).data.numpy()[0])
+                    labels.append('vimco')
+                else:
+                    ax.step(np.arange(num_mixtures), iwae_vimco.inference_network.get_z_params(test_x_var).data.numpy()[0], label='VIMCO', alpha=0.7, color='C5', linestyle=iwae_linestyle, dashes=(7, 0.8))
+                    # ax.scatter(np.arange(num_mixtures), iwae_vimco.inference_network.get_z_params(test_x_var).data.numpy()[0], s=0.5, label='VIMCO', color='C5')
+
+                ### WS
+                if plot_bars:
+                    data.append(ws.inference_network.get_z_params(test_x_var).data.numpy()[0])
+                    labels.append('ws')
+                else:
+                    ax.step(np.arange(num_mixtures), ws.inference_network.get_z_params(test_x_var).data.numpy()[0], alpha=0.7, color='C1')
+                    # ax.scatter(np.arange(num_mixtures), ws.inference_network.get_z_params(test_x_var).data.numpy()[0], s=0.5, color='C1')
 
                 ### WW
                 for ww_prob_idx, (ww, ww_prob) in enumerate(zip(wws, ww_probs)):
-                    ax.plot(np.arange(num_mixtures), ww.inference_network.get_z_params(test_x_var).data.numpy()[0], label='ww {}'.format(ww_prob), alpha=0.8, color='C{}'.format(ww_prob_idx + 6))
-                    # data.append(ww.inference_network.get_z_params(test_x_var).data.numpy()[0])
-                    # labels.append('ww {}'.format(ww_prob))
+                    if plot_bars:
+                        data.append(ww.inference_network.get_z_params(test_x_var).data.numpy()[0])
+                        labels.append('ww {}'.format(ww_prob))
+                    else:
+                        ax.step(np.arange(num_mixtures), ww.inference_network.get_z_params(test_x_var).data.numpy()[0], label='{}'.format('WW' if ww_prob == 1 else r'$\delta$-WW'), alpha=0.7, color='C{}'.format(ww_prob_idx + 6))
+                        # ax.scatter(np.arange(num_mixtures), ww.inference_network.get_z_params(test_x_var).data.numpy()[0], s=0.5, label='WW {}'.format('' if ww_prob == 1 else ww_prob), color='C{}'.format(ww_prob_idx + 6))
 
-                # ax = bar(ax, np.arange(num_mixtures), data, 0.95 / len(data), labels)
+                if plot_bars:
+                    ax = bar(ax, np.arange(num_mixtures), data, 0.95 / len(data), labels, colors=bar_colors)
 
     for num_particles_idx, num_particles in enumerate(num_particles_list):
         ax = axs[0, num_particles_idx * (num_test_x + 1) + (num_test_x + 1) // 2]
-        ax.text(0, 1.3, '$K = {}$'.format(num_particles), verticalalignment='bottom', horizontalalignment='center', transform=ax.transAxes)
+        ax.text(0, 1.25, '$K = {}$'.format(num_particles), verticalalignment='bottom', horizontalalignment='center', transform=ax.transAxes)
 
     axs[-1, ncols // 2].legend(bbox_to_anchor=(0, -0.25), loc='upper center', ncol=10)
     fig.tight_layout(pad=0)

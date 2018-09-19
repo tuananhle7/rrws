@@ -1,7 +1,8 @@
 from collections import OrderedDict
 from torch.autograd import Variable
-from util import *
 
+import util
+from util import logsumexp, lognormexp, OnlineMeanStd
 import uuid
 import numpy as np
 import torch
@@ -172,28 +173,6 @@ class InferenceNetwork(nn.Module):
         return self.z_logpdf(z, x)
 
 
-# class RelaxControlVariate(nn.Module):
-#     def __init__(self):
-#         super(RelaxControlVariate, self).__init__()
-#         self.control_variate_z = nn.Sequential(
-#             nn.Linear(2, 16),
-#             nn.Tanh(),
-#             nn.Linear(16, 16),
-#             nn.Tanh(),
-#             nn.Linear(16, 1),
-#             nn.ReLU()
-#         )
-#
-#     def forward(self, aux_z, aux_z_tilde, x):
-#         c_z = self.control_variate_z(
-#             torch.cat([x.unsqueeze(-1), aux_z.unsqueeze(-1)], dim=1)
-#         ).squeeze(-1)
-#         c_z_tilde = self.control_variate_z(
-#             torch.cat([x.unsqueeze(-1), aux_z_tilde.unsqueeze(-1)], dim=1)
-#         ).squeeze(-1)
-#         return c_z, c_z_tilde
-
-
 class IWAE(nn.Module):
     def __init__(self, p_init_mixture_probs_pre_softmax, init_mean_multiplier, init_log_stds):
         super(IWAE, self).__init__()
@@ -287,17 +266,17 @@ def train_iwae(
             print('Saved to {}'.format(filename))
 
         if i % logging_interval == 0:
-            elbo_history.append(elbo.data[0])
-            log_evidence_history.append(torch.mean(iwae.generative_network.log_evidence(test_x)).data[0])
+            elbo_history.append(elbo.item())
+            log_evidence_history.append(torch.mean(iwae.generative_network.log_evidence(test_x)).item())
 
             q_posterior = iwae.inference_network.get_z_params(test_x)
             p_posterior = iwae.generative_network.posterior(test_x)
-            posterior_norm_history.append(torch.mean(torch.norm(q_posterior - p_posterior, p=2, dim=1)).data[0])
-            true_posterior_norm_history.append(torch.mean(torch.norm(q_posterior - true_posterior, p=2, dim=1)).data[0])
+            posterior_norm_history.append(torch.mean(torch.norm(q_posterior - p_posterior, p=2, dim=1)).item())
+            true_posterior_norm_history.append(torch.mean(torch.norm(q_posterior - true_posterior, p=2, dim=1)).item())
 
             p_mixture_probs = iwae.generative_network.get_z_params().data.cpu().numpy()
             p_mixture_probs_norm_history.append(np.linalg.norm(p_mixture_probs - true_p_mixture_probs))
-            mean_multiplier_history.append(iwae.generative_network.mean_multiplier.data[0])
+            mean_multiplier_history.append(iwae.generative_network.mean_multiplier.item())
 
             p_online_mean_std = OnlineMeanStd()
             q_online_mean_std = OnlineMeanStd()
@@ -439,7 +418,7 @@ def train_rws(
             s_loss = rws('sleep_phi', num_samples=num_samples)
             w_loss = rws('wake_phi', x=x, num_particles=num_particles, q_mixture_prob=q_mixture_prob)
             d = torch.abs(s_loss - w_loss)
-            alpha = 1 - d.neg().exp().data[0]
+            alpha = 1 - d.neg().exp().item()
             loss = alpha * w_loss + (1 - alpha) * s_loss
             loss.backward()
             phi_optimizer.step()
@@ -458,16 +437,16 @@ def train_rws(
             print('Saved to {}'.format(filename))
 
         if i % logging_interval == 0:
-            log_evidence_history.append(torch.mean(rws.generative_network.log_evidence(test_x)).data[0])
+            log_evidence_history.append(torch.mean(rws.generative_network.log_evidence(test_x)).item())
 
             q_posterior = rws.inference_network.get_z_params(test_x)
             p_posterior = rws.generative_network.posterior(test_x)
-            posterior_norm_history.append(torch.mean(torch.norm(q_posterior - p_posterior, p=2, dim=1)).data[0])
-            true_posterior_norm_history.append(torch.mean(torch.norm(q_posterior - true_posterior, p=2, dim=1)).data[0])
+            posterior_norm_history.append(torch.mean(torch.norm(q_posterior - p_posterior, p=2, dim=1)).item())
+            true_posterior_norm_history.append(torch.mean(torch.norm(q_posterior - true_posterior, p=2, dim=1)).item())
 
             p_mixture_probs = rws.generative_network.get_z_params().data.cpu().numpy()
             p_mixture_probs_norm_history.append(np.linalg.norm(p_mixture_probs - true_p_mixture_probs))
-            mean_multiplier_history.append(rws.generative_network.mean_multiplier.data[0])
+            mean_multiplier_history.append(rws.generative_network.mean_multiplier.item())
 
             p_online_mean_std = OnlineMeanStd()
             for mc_sample_idx in range(num_mc_samples):
@@ -505,7 +484,7 @@ def train_rws(
                     s_loss = rws('sleep_phi', num_samples=num_samples)
                     w_loss = rws('wake_phi', x=x, num_particles=num_particles)
                     d = torch.abs(s_loss - w_loss)
-                    alpha = 1 - d.neg().exp().data[0]
+                    alpha = 1 - d.neg().exp().item()
                     loss = alpha * w_loss + (1 - alpha) * s_loss
                     loss.backward()
                     q_online_mean_std.update([p.grad for p in rws.inference_network.parameters()])
@@ -517,7 +496,7 @@ def train_rws(
             q_grad_mean_history.append(q_grad_stats[0])
 
             print('Iteration {}: phi-loss = {}, log_evidence = {}, L2(p, true p) = {}, L2(q, current p) = {}'.format(
-                i, loss.data[0], log_evidence_history[-1], p_mixture_probs_norm_history[-1], posterior_norm_history[-1]
+                i, loss.item(), log_evidence_history[-1], p_mixture_probs_norm_history[-1], posterior_norm_history[-1]
             ))
 
     return tuple(map(np.array, [
@@ -526,16 +505,17 @@ def train_rws(
 
 
 def main(args):
-    num_iterations = 100000
-    logging_interval = 1000
-    saving_interval = 1000
+    num_iterations = args.num_iterations
+    logging_interval = args.logging_interval
+    saving_interval = args.saving_interval
 
     num_mixtures = args.num_mixtures
 
     temp = np.arange(num_mixtures) + 5
     true_p_mixture_probs = temp / np.sum(temp)
     # p_init_mixture_probs_pre_softmax = np.log(np.array(list(reversed(temp)))) # near
-    p_init_mixture_probs_pre_softmax = np.array(list(reversed(2 * np.arange(num_mixtures)))) # far
+    p_init_mixture_probs_pre_softmax = np.array(list(reversed(
+        2 * np.arange(num_mixtures))))  # far
 
     true_mean_multiplier = 10
     init_mean_multiplier = true_mean_multiplier
@@ -547,12 +527,23 @@ def main(args):
     num_test_samples = 100
     num_samples = 100
 
-    true_generative_network = GenerativeNetwork(np.log(true_p_mixture_probs) / softmax_multiplier, true_mean_multiplier, true_log_stds)
+    true_generative_network = GenerativeNetwork(
+        np.log(true_p_mixture_probs) / softmax_multiplier,
+        true_mean_multiplier, true_log_stds)
     if CUDA:
         true_generative_network.cuda()
     test_x = generate_obs(num_test_samples, true_generative_network)
-    true_log_evidence = torch.mean(true_generative_network.log_evidence(test_x)).data[0]
+    true_log_evidence = torch.mean(true_generative_network.log_evidence(test_x)).item()
 
+    util.save_np_arrays(
+        [num_iterations, logging_interval, saving_interval, num_mixtures,
+         num_particles, true_p_mixture_probs, true_mean_multiplier,
+         true_log_stds, true_log_evidence],
+        [safe_fname(filename, 'npy') for filename in
+         ['num_iterations', 'logging_interval', 'saving_interval',
+          'num_mixtures', 'num_particles', 'true_p_mixture_probs',
+          'true_mean_multiplier', 'true_log_stds', 'true_log_evidence']]
+    )
     for filename, data in zip(
         ['num_iterations', 'logging_interval', 'saving_interval', 'num_mixtures', 'num_particles', 'true_p_mixture_probs', 'true_mean_multiplier', 'true_log_stds', 'true_log_evidence'],
         [num_iterations, logging_interval, saving_interval, num_mixtures, num_particles, true_p_mixture_probs, true_mean_multiplier, true_log_stds, true_log_evidence],
@@ -562,120 +553,110 @@ def main(args):
 
     for seed in args.seeds:
         # IWAE
-        iwae_filenames = ['log_evidence_history', 'elbo_history', 'posterior_norm_history', 'true_posterior_norm_history', 'p_mixture_probs_norm_history', 'mean_multiplier_history', 'p_grad_std_history', 'q_grad_std_history', 'q_grad_mean_history']
+        iwae_filenames = [
+            'log_evidence_history', 'elbo_history', 'posterior_norm_history',
+            'true_posterior_norm_history', 'p_mixture_probs_norm_history',
+            'mean_multiplier_history', 'p_grad_std_history',
+            'q_grad_std_history', 'q_grad_mean_history']
 
         ## Reinforce
         if args.all or args.reinforce:
             gradient_estimator = 'reinforce'
-            for [data, filename] in zip(
-                list(train_iwae(
-                    p_init_mixture_probs_pre_softmax, init_mean_multiplier, init_log_stds,
-                    true_p_mixture_probs, true_mean_multiplier, true_log_stds, test_x,
-                    num_iterations, num_samples, num_particles, num_mc_samples,
-                    gradient_estimator,
-                    logging_interval, saving_interval, seed=seed
-                )),
-                iwae_filenames
-            ):
-                filename = safe_fname('iwae_reinforce_{}_{}'.format(filename, seed), 'npy')
-                np.save(filename, data)
-                print('Saved to {}'.format(filename))
+            train_stats = list(train_iwae(
+                p_init_mixture_probs_pre_softmax, init_mean_multiplier,
+                init_log_stds, true_p_mixture_probs, true_mean_multiplier,
+                true_log_stds, test_x, num_iterations, num_samples,
+                num_particles, num_mc_samples, gradient_estimator,
+                logging_interval, saving_interval, seed=seed
+            ))
+            util.save_np_arrays(
+                train_stats,
+                [safe_fname('iwae_reinforce_{}_{}'.format(filename, seed),
+                            'npy') for filename in iwae_filanemes])
 
         ## VIMCO
         if args.all or args.vimco:
             gradient_estimator = 'vimco'
-            for [data, filename] in zip(
-                list(train_iwae(
-                    p_init_mixture_probs_pre_softmax, init_mean_multiplier, init_log_stds,
-                    true_p_mixture_probs, true_mean_multiplier, true_log_stds, test_x,
-                    num_iterations, num_samples, num_particles, num_mc_samples,
-                    gradient_estimator,
-                    logging_interval, saving_interval, seed=seed
-                )),
-                iwae_filenames
-            ):
-                filename = safe_fname('iwae_vimco_{}_{}'.format(filename, seed), 'npy')
-                np.save(filename, data)
-                print('Saved to {}'.format(filename))
-
-        ## Relax
+            train_stats = list(train_iwae(
+                p_init_mixture_probs_pre_softmax, init_mean_multiplier, init_log_stds,
+                true_p_mixture_probs, true_mean_multiplier, true_log_stds, test_x,
+                num_iterations, num_samples, num_particles, num_mc_samples,
+                gradient_estimator,
+                logging_interval, saving_interval, seed=seed
+            ))
+            util.save_np_arrays(
+                train_stats,
+                [safe_fname('iwae_vimco_{}_{}'.format(filename, seed), 'npy')
+                 for filename in iwae_filenames])
 
         # RWS
-        rws_filenames = ['log_evidence_history', 'posterior_norm_history', 'true_posterior_norm_history', 'p_mixture_probs_norm_history', 'mean_multiplier_history', 'p_grad_std_history', 'q_grad_std_history', 'q_grad_mean_history']
+        rws_filenames = [
+            'log_evidence_history', 'posterior_norm_history',
+            'true_posterior_norm_history', 'p_mixture_probs_norm_history',
+            'mean_multiplier_history', 'p_grad_std_history',
+            'q_grad_std_history', 'q_grad_mean_history']
 
         ## WS
         if args.all or args.ws:
             mode = 'ws'
-            for [data, filename] in zip(
-                list(train_rws(
-                    p_init_mixture_probs_pre_softmax, init_mean_multiplier, init_log_stds,
-                    true_p_mixture_probs, true_mean_multiplier, true_log_stds, test_x,
-                    mode,
-                    num_iterations, num_samples, num_particles, num_mc_samples,
-                    logging_interval, saving_interval, seed=seed
-                )),
-                rws_filenames
-            ):
-                filename = safe_fname('{}_{}_{}'.format(mode, filename, seed), 'npy')
-                np.save(filename, data)
-                print('Saved to {}'.format(filename))
+            train_stats = list(train_rws(
+                p_init_mixture_probs_pre_softmax, init_mean_multiplier,
+                init_log_stds, true_p_mixture_probs, true_mean_multiplier,
+                true_log_stds, test_x, mode, num_iterations, num_samples,
+                num_particles, num_mc_samples, logging_interval,
+                saving_interval, seed=seed
+            ))
+            util.save_np_arrays(train_stats, [
+                safe_fname('{}_{}_{}'.format(mode, filename, seed), 'npy')
+                for filename in rws_filenames])
 
         ## WW
         if args.all or args.ww:
             mode = 'ww'
             for q_mixture_prob in args.ww_probs:
-                for [data, filename] in zip(
-                    list(train_rws(
-                        p_init_mixture_probs_pre_softmax, init_mean_multiplier, init_log_stds,
-                        true_p_mixture_probs, true_mean_multiplier, true_log_stds, test_x,
-                        mode,
-                        num_iterations, num_samples, num_particles, num_mc_samples,
-                        logging_interval, saving_interval, q_mixture_prob, seed=seed
-                    )),
-                    rws_filenames
-                ):
-                    filename = safe_fname('{}_{}_{}_{}'.format(
+                train_stats = list(train_rws(
+                    p_init_mixture_probs_pre_softmax, init_mean_multiplier,
+                    init_log_stds, true_p_mixture_probs, true_mean_multiplier,
+                    true_log_stds, test_x, mode, num_iterations, num_samples,
+                    num_particles, num_mc_samples, logging_interval,
+                    saving_interval, q_mixture_prob, seed=seed
+                ))
+                util.save_np_arrays(train_stats, [
+                    safe_fname('{}_{}_{}_{}'.format(
                         mode,
                         str(q_mixture_prob).replace('.', '-'),
                         filename,
                         seed
-                    ), 'npy')
-                    np.save(filename, data)
-                    print('Saved to {}'.format(filename))
+                    ), 'npy') for filename in rws_filenames
+                ])
 
         ## WSW
         if args.all or args.wsw:
             mode = 'wsw'
-            for [data, filename] in zip(
-                list(train_rws(
-                    p_init_mixture_probs_pre_softmax, init_mean_multiplier, init_log_stds,
-                    true_p_mixture_probs, true_mean_multiplier, true_log_stds, test_x,
-                    mode,
-                    num_iterations, num_samples, num_particles, num_mc_samples,
-                    logging_interval, saving_interval, seed=seed
-                )),
-                rws_filenames
-            ):
-                filename = safe_fname('{}_{}_{}'.format(mode, filename, seed), 'npy')
-                np.save(filename, data)
-                print('Saved to {}'.format(filename))
+            train_stats = list(train_rws(
+                p_init_mixture_probs_pre_softmax, init_mean_multiplier,
+                init_log_stds, true_p_mixture_probs, true_mean_multiplier,
+                true_log_stds, test_x, mode, num_iterations, num_samples,
+                num_particles, num_mc_samples, logging_interval,
+                saving_interval, seed=seed
+            ))
+            util.save_np_arrays(train_stats,
+                [safe_fname('{}_{}_{}'.format(mode, filename, seed), 'npy')
+                 for filename in rws_filenames])
 
         ## WSWA
         if args.all or args.wswa:
             mode = 'wswa'
-            for [data, filename] in zip(
-                list(train_rws(
-                    p_init_mixture_probs_pre_softmax, init_mean_multiplier, init_log_stds,
-                    true_p_mixture_probs, true_mean_multiplier, true_log_stds, test_x,
-                    mode,
-                    num_iterations, num_samples, num_particles, num_mc_samples,
-                    logging_interval, saving_interval, seed=seed
-                )),
-                rws_filenames
-            ):
-                filename = safe_fname('{}_{}_{}'.format(mode, filename, seed), 'npy')
-                np.save(filename, data)
-                print('Saved to {}'.format(filename))
+            train_stats = list(train_rws(
+                p_init_mixture_probs_pre_softmax, init_mean_multiplier,
+                init_log_stds, true_p_mixture_probs, true_mean_multiplier,
+                true_log_stds, test_x, mode, num_iterations, num_samples,
+                num_particles, num_mc_samples, logging_interval,
+                saving_interval, seed=seed
+            ))
+            util.save_np_arrays(train_stats, [
+                safe_fname('{}_{}_{}'.format(mode, filename, seed), 'npy')
+                for filename in rws_filenames])
 
 
 # globals
@@ -684,7 +665,7 @@ UID = str(uuid.uuid4())[:8]
 
 
 def safe_fname(fname, ext):
-    return '{}/{}_{}.{}'.format(WORKING_DIR, fname, UID, ext)
+    return '{}/{}_{}.{}'.format(util.WORKING_DIR, fname, UID, ext)
 
 
 def set_seed(seed):
@@ -702,6 +683,9 @@ if __name__ == '__main__':
     parser.add_argument('--cuda', action='store_true', default=False,
                         help='enables CUDA use')
     parser.add_argument('--num-mixtures', type=int, default=20)
+    parser.add_argument('--num-iterations', type=int, default=100000)
+    parser.add_argument('--logging-interval', type=int, default=1000)
+    parser.add_argument('--saving-interval', type=int, default=1000)
     parser.add_argument('--num-particles', type=int, default=5)
     parser.add_argument('--seeds', nargs='*', type=int, default=[1])
     parser.add_argument('--all', action='store_true', default=False)

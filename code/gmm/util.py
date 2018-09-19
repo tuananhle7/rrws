@@ -93,3 +93,9 @@ def lognormexp(values, dim=0):
         log_denominator = logsumexp(values, dim=dim, keepdim=True)
         # log_numerator = values
         return values - log_denominator
+
+
+def save_np_arrays(np_arrays, filenames=None):
+    for filename, np_array in zip(filenames, np_arrays):
+        np.save(filename, np_array)
+        print('Saved to {}'.format(filename))
