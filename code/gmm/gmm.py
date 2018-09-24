@@ -606,7 +606,7 @@ def main(args):
             util.save_np_arrays(
                 train_stats,
                 [safe_fname('iwae_reinforce_{}_{}'.format(filename, seed),
-                            'npy') for filename in iwae_filanemes])
+                            'npy') for filename in iwae_filenames])
 
         ## VIMCO
         if args.all or args.vimco:
