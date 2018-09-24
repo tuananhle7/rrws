@@ -382,13 +382,13 @@ def train_rws(
     q_grad_mean_history = []
 
     true_generative_network = GenerativeNetwork(np.log(true_p_mixture_probs) / softmax_multiplier, true_mean_multiplier, true_log_stds)
-    if CUDA:
-        rws.cuda()
-        true_generative_network.cuda()
     true_posterior = true_generative_network.posterior(test_x)
 
     set_seed(seed)
     rws = RWS(p_init_mixture_probs_pre_softmax, init_mean_multiplier, init_log_stds) # true_generative_network)
+    if CUDA:
+        rws.cuda()
+        true_generative_network.cuda()
     if train_sga:
         num_theta_param_tensors = len(
             list(rws.generative_network.parameters()))
