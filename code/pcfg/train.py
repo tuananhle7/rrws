@@ -43,26 +43,29 @@ def train_wake_wake(generative_model, inference_network,
         sentences = [util.get_leaves(true_generative_model.sample_tree())
                      for _ in range(batch_size)]
 
+        log_weight, log_q = losses.get_log_weight_and_log_q(
+            generative_model, inference_network, sentences, num_particles)
+
         # wake theta
         optimizer_phi.zero_grad()
         optimizer_theta.zero_grad()
-        wake_theta_loss = losses.get_wake_theta_loss(
-            generative_model, inference_network, sentences, num_particles)
-        wake_theta_loss.backward()
+        wake_theta_loss, elbo = losses.get_wake_theta_loss_from_log_weight(
+            log_weight)
+        wake_theta_loss.backward(retain_graph=True)
         optimizer_theta.step()
 
         # wake phi
         optimizer_phi.zero_grad()
         optimizer_theta.zero_grad()
-        wake_phi_loss = losses.get_wake_phi_loss(
-            generative_model, inference_network, sentences, num_particles)
+        wake_phi_loss = losses.get_wake_phi_loss_from_log_weight_and_log_q(
+            log_weight, log_q)
         wake_phi_loss.backward()
         optimizer_phi.step()
 
         if callback is not None:
             callback(iteration, wake_theta_loss.item(), wake_phi_loss.item(),
-                     generative_model, inference_network, optimizer_theta,
-                     optimizer_phi)
+                     elbo.item(), generative_model, inference_network,
+                     optimizer_theta, optimizer_phi)
 
     return optimizer_theta, optimizer_phi
 
@@ -71,16 +74,19 @@ class TrainWakeWakeCallback():
     def __init__(self, logging_interval=10):
         self.wake_theta_loss_history = []
         self.wake_phi_loss_history = []
+        self.elbo_history = []
         self.logging_interval = logging_interval
 
-    def __call__(self, iteration, wake_theta_loss, wake_phi_loss,
+    def __call__(self, iteration, wake_theta_loss, wake_phi_loss, elbo,
                  generative_model, inference_network, optimizer_theta,
                  optimizer_phi):
         if iteration % self.logging_interval == 0:
-            print('Iteration {} losses: theta = {:.3f}, phi = {:.3f}'.format(
-                iteration, wake_theta_loss, wake_phi_loss))
+            print('Iteration {} losses: theta = {:.3f}, phi = {:.3f},'
+                  'elbo = {:.3f}'.format(iteration, wake_theta_loss,
+                                         wake_phi_loss, elbo))
             self.wake_theta_loss_history.append(wake_theta_loss)
             self.wake_phi_loss_history.append(wake_phi_loss)
+            self.elbo_history.append(elbo)
 
 
 def train_iwae(algorithm, generative_model, inference_network,

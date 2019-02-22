@@ -4,6 +4,10 @@ import util
 
 
 def get_sleep_loss(generative_model, inference_network, num_samples=1):
+    """Returns:
+
+        loss: scalar that we call .backward() on and step the optimizer.
+    """
     log_q_sum = 0
     for _ in range(num_samples):
         tree = generative_model.sample_tree()
@@ -36,24 +40,44 @@ def get_log_weight_and_log_q(generative_model, inference_network, sentences,
 
 
 def get_wake_theta_loss_from_log_weight(log_weight):
+    """Returns:
+
+        loss: scalar that we call .backward() on and step the optimizer.
+        elbo: average elbo over data
+    """
+    _, num_particles = log_weight.shape
     log_evidence = torch.logsumexp(log_weight, dim=1) - np.log(num_particles)
-    return -torch.mean(log_evidence)
+    elbo = torch.mean(log_evidence)
+    return -elbo, elbo
 
 
 def get_wake_theta_loss(generative_model, inference_network, sentences,
                         num_particles=1):
+    """Returns:
+
+        loss: scalar that we call .backward() on and step the optimizer.
+        elbo: average elbo over data
+    """
     log_weight, _ = get_log_weight_and_log_q(
         generative_model, inference_network, sentences, num_particles)
     return get_wake_theta_loss_from_log_weight(log_weight)
 
 
 def get_wake_phi_loss_from_log_weight_and_log_q(log_weight, log_q):
+    """Returns:
+
+        loss: scalar that we call .backward() on and step the optimizer.
+    """
     normalized_weight = util.exponentiate_and_normalize(log_weight, dim=1)
     return torch.mean(-torch.sum(normalized_weight.detach() * log_q, dim=1))
 
 
 def get_wake_phi_loss(generative_model, inference_network, sentences,
                       num_particles=1):
+    """Returns:
+
+        loss: scalar that we call .backward() on and step the optimizer.
+    """
     log_weight, log_q = get_log_weight_and_log_q(
         generative_model, inference_network, sentences, num_particles)
     return get_wake_phi_loss_from_log_weight_and_log_q(log_weight, log_q)
