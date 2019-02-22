@@ -175,6 +175,9 @@ def save_models(generative_model, inference_network, pcfg_path,
     inference_network_path = os.path.join(model_folder, 'inf.pt')
     pcfg_path_path = os.path.join(model_folder, 'pcfg_path.txt')
 
+    if not os.path.exists(model_folder):
+        os.makedirs(model_folder)
+
     torch.save(generative_model.state_dict(), generative_model_path)
     print('Saved to {}'.format(generative_model_path))
     torch.save(inference_network.state_dict(), inference_network_path)
@@ -256,3 +259,16 @@ def init_models(pcfg_path):
         grammar, true_production_probs)
 
     return generative_model, inference_network, true_generative_model
+
+
+def range_except(end, i):
+    """Outputs an increasing list from 0 to (end - 1) except i.
+    Args:
+        end: int
+        i: int
+
+    Returns: list of length (end - 1)
+    """
+
+    result = list(set(range(end)))
+    return result[:i] + result[(i + 1):]

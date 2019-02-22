@@ -1,6 +1,7 @@
 import torch
 import losses
 import util
+import itertools
 
 
 def train_sleep(generative_model, inference_network, num_samples,
@@ -20,7 +21,7 @@ def train_sleep(generative_model, inference_network, num_samples,
 
 
 class TrainSleepCallback():
-    def __init__(self, logging_interval=10):
+    def __init__(self, logging_interval=10, saving_interval=10):
         self.sleep_loss_history = []
         self.logging_interval = logging_interval
 
@@ -80,3 +81,54 @@ class TrainWakeWakeCallback():
                 iteration, wake_theta_loss, wake_phi_loss))
             self.wake_theta_loss_history.append(wake_theta_loss)
             self.wake_phi_loss_history.append(wake_phi_loss)
+
+
+def train_iwae(algorithm, generative_model, inference_network,
+               true_generative_model, batch_size, num_iterations,
+               num_particles, callback=None):
+    """Train using IWAE objective.
+
+    Args:
+        algorithm: reinforce or vimco
+    """
+
+    parameters = itertools.chain.from_iterable(
+        [x.parameters() for x in [generative_model, inference_network]])
+    optimizer = torch.optim.Adam(parameters)
+
+    for iteration in range(num_iterations):
+        # generate synthetic data
+        sentences = [util.get_leaves(true_generative_model.sample_tree())
+                     for _ in range(batch_size)]
+
+        # wake theta
+        optimizer.zero_grad()
+        if algorithm == 'vimco':
+            loss, elbo = losses.get_vimco_loss(
+                generative_model, inference_network, sentences, num_particles)
+        elif algorithm == 'reinforce':
+            loss, elbo = losses.get_reinforce_loss(
+                generative_model, inference_network, sentences, num_particles)
+        loss.backward()
+        optimizer.step()
+
+        if callback is not None:
+            callback(iteration, loss.item(), elbo.item(), generative_model,
+                     inference_network, optimizer)
+
+    return optimizer
+
+
+class TrainIwaeCallback():
+    def __init__(self, logging_interval=10):
+        self.loss_history = []
+        self.elbo_history = []
+        self.logging_interval = logging_interval
+
+    def __call__(self, iteration, loss, elbo, generative_model,
+                 inference_network, optimizer):
+        if iteration % self.logging_interval == 0:
+            print('Iteration {} loss = {:.3f}, elbo = {:.3f}'.format(
+                iteration, loss, elbo))
+            self.loss_history.append(loss)
+            self.elbo_history.append(elbo)
