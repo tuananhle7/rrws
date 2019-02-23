@@ -71,11 +71,21 @@ def train_wake_wake(generative_model, inference_network,
 
 
 class TrainWakeWakeCallback():
-    def __init__(self, logging_interval=10):
+    def __init__(self, pcfg_path, model_folder, true_generative_model,
+                 logging_interval=10, checkpoint_interval=100,
+                 eval_interval=10):
+        self.pcfg_path = pcfg_path
+        self.model_folder = model_folder
+        self.true_generative_model = true_generative_model
+        self.logging_interval = logging_interval
+        self.checkpoint_interval = checkpoint_interval
+        self.eval_interval = eval_interval
+
         self.wake_theta_loss_history = []
         self.wake_phi_loss_history = []
         self.elbo_history = []
-        self.logging_interval = logging_interval
+        self.generative_model_discrepancy_history = []
+        self.inference_network_discrepancy_history = []
 
     def __call__(self, iteration, wake_theta_loss, wake_phi_loss, elbo,
                  generative_model, inference_network, optimizer_theta,
@@ -87,6 +97,23 @@ class TrainWakeWakeCallback():
             self.wake_theta_loss_history.append(wake_theta_loss)
             self.wake_phi_loss_history.append(wake_phi_loss)
             self.elbo_history.append(elbo)
+
+        if iteration % self.checkpoint_interval == 0:
+            stats_filename = util.get_stats_filename(self.model_folder)
+            util.save_object(self, stats_filename)
+            util.save_models(generative_model, inference_network,
+                             self.pcfg_path, self.model_folder)
+
+        if iteration % self.eval_interval == 0:
+            self.generative_model_discrepancy_history.append(
+                util.get_generative_model_discrepancy(
+                    self.true_generative_model, generative_model))
+            self.inference_network_discrepancy_history.append(
+                util.get_inference_network_discrepancy(
+                    generative_model, inference_network))
+            print('Iteration {} gen_discr = {:.3f}, inf_discr = {:.3f}'.format(
+                  iteration, self.generative_model_discrepancy_history[-1],
+                  self.inference_network_discrepancy_history[-1]))
 
 
 def train_iwae(algorithm, generative_model, inference_network,
@@ -126,15 +153,42 @@ def train_iwae(algorithm, generative_model, inference_network,
 
 
 class TrainIwaeCallback():
-    def __init__(self, logging_interval=10):
+    def __init__(self, pcfg_path, model_folder, true_generative_model,
+                 logging_interval=10, checkpoint_interval=100,
+                 eval_interval=10):
+        self.pcfg_path = pcfg_path
+        self.model_folder = model_folder
+        self.true_generative_model = true_generative_model
+        self.logging_interval = logging_interval
+        self.checkpoint_interval = checkpoint_interval
+        self.eval_interval = eval_interval
+
         self.loss_history = []
         self.elbo_history = []
-        self.logging_interval = logging_interval
+        self.generative_model_discrepancy_history = []
+        self.inference_network_discrepancy_history = []
 
     def __call__(self, iteration, loss, elbo, generative_model,
                  inference_network, optimizer):
         if iteration % self.logging_interval == 0:
             print('Iteration {} loss = {:.3f}, elbo = {:.3f}'.format(
-                iteration, loss, elbo))
+                  iteration, loss, elbo))
             self.loss_history.append(loss)
             self.elbo_history.append(elbo)
+
+        if iteration % self.checkpoint_interval == 0:
+            stats_filename = util.get_stats_filename(self.model_folder)
+            util.save_object(self, stats_filename)
+            util.save_models(generative_model, inference_network,
+                             self.pcfg_path, self.model_folder)
+
+        if iteration % self.eval_interval == 0:
+            self.generative_model_discrepancy_history.append(
+                util.get_generative_model_discrepancy(
+                    self.true_generative_model, generative_model))
+            self.inference_network_discrepancy_history.append(
+                util.get_inference_network_discrepancy(
+                    generative_model, inference_network))
+            print('Iteration {} gen_discr = {:.3f}, inf_discr = {:.3f}'.format(
+                  iteration, self.generative_model_discrepancy_history[-1],
+                  self.inference_network_discrepancy_history[-1]))

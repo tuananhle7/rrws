@@ -5,6 +5,8 @@ import os
 import models
 import string
 import Levenshtein
+import losses
+import pickle
 
 
 def lognormexp(values, dim=0):
@@ -188,6 +190,8 @@ def save_models(generative_model, inference_network, pcfg_path,
 
 
 def load_models(model_folder='.'):
+    """Returns: generative_model, inference network
+    """
     generative_model_path = os.path.join(model_folder, 'gen.pt')
     inference_network_path = os.path.join(model_folder, 'inf.pt')
     pcfg_path_path = os.path.join(model_folder, 'pcfg_path.txt')
@@ -252,6 +256,8 @@ def get_levenshtein_distance(sentence_1, sentence_2, terminals):
 
 
 def init_models(pcfg_path):
+    """Returns: generative_model, inference_network, true_generative_model"""
+
     grammar, true_production_probs = read_pcfg(pcfg_path)
     generative_model = models.GenerativeModel(grammar)
     inference_network = models.InferenceNetwork(grammar)
@@ -272,3 +278,69 @@ def range_except(end, i):
 
     result = list(set(range(end)))
     return result[:i] + result[(i + 1):]
+
+
+def normalize(x, dim=0):
+    return x / torch.sum(x, dim=0, keepdim=True)
+
+
+def get_production_probs(generative_model):
+    return {
+        non_terminal: normalize(torch.exp(
+            generative_model.production_logits[non_terminal])).detach()
+        for non_terminal in generative_model.grammar['non_terminals']}
+
+
+def get_kl(probs_1, probs_2):
+    """KL between two probability tensors.
+
+    Args:
+        probs_1: probability tensor of shape [num_probs]
+        probs_2: probability tensor of shape [num_probs]
+
+    Returns: KL(p1 || p2), scalar tensor
+    """
+    return torch.sum(probs_1 * (torch.log(probs_1) - torch.log(probs_2)))
+
+
+def get_inference_network_discrepancy(generative_model, inference_network,
+                                      num_samples=100):
+    """Expected KL(posterior || q) + const as a measure of q's quality.
+
+    Returns: detached scalar E_p(x)[KL(p(z | x) || q(z | x))] + H(z | x) where
+        the second term is constant wrt the inference network.
+    """
+
+    return losses.get_sleep_loss(generative_model, inference_network,
+                                 num_samples).detach()
+
+
+def get_generative_model_discrepancy(true_generative_model, generative_model):
+    """Average KL between true and learned productions probs."""
+
+    true_generative_model_probs = get_production_probs(true_generative_model)
+    generative_model_probs = get_production_probs(generative_model)
+    non_terminals = true_generative_model.grammar['non_terminals']
+    result = 0
+    for non_terminal in non_terminals:
+        kl = get_kl(true_generative_model_probs[non_terminal],
+                    generative_model_probs[non_terminal])
+        result += kl
+    return result / len(non_terminals)
+
+
+# https://stackoverflow.com/questions/4529815/saving-an-object-data-persistence
+def save_object(obj, filename):
+    with open(filename, 'wb') as output:
+        pickle.dump(obj, output, pickle.HIGHEST_PROTOCOL)
+    print('Saved to {}'.format(filename))
+
+
+def load_object(filename):
+    with open(filename, 'rb') as input_:
+        obj = pickle.load(input_)
+    return obj
+
+
+def get_stats_filename(model_folder='.'):
+    return os.path.join(model_folder, 'stats.pkl')
