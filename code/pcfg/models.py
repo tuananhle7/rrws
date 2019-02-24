@@ -31,7 +31,7 @@ class GenerativeModel(nn.Module):
             return symbol
         else:
             dist = Categorical(logits=self.production_logits[symbol])
-            production_index = dist.sample()
+            production_index = dist.sample().detach()
             production = self.grammar['productions'][symbol][production_index]
             return [symbol] + [self.sample_tree(s) for s in production]
 

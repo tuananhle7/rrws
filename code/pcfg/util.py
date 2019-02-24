@@ -330,6 +330,10 @@ def get_p_error(true_generative_model, generative_model):
 
 # https://stackoverflow.com/questions/4529815/saving-an-object-data-persistence
 def save_object(obj, filename):
+    dir = os.path.dirname(filename)
+    if not os.path.exists(dir):
+        os.makedirs(dir)
+
     with open(filename, 'wb') as output:
         pickle.dump(obj, output, pickle.HIGHEST_PROTOCOL)
     print('Saved to {}'.format(filename))
