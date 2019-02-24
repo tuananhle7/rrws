@@ -303,8 +303,7 @@ def get_kl(probs_1, probs_2):
     return torch.sum(probs_1 * (torch.log(probs_1) - torch.log(probs_2)))
 
 
-def get_inference_network_discrepancy(generative_model, inference_network,
-                                      num_samples=100):
+def get_q_error(generative_model, inference_network, num_samples=100):
     """Expected KL(posterior || q) + const as a measure of q's quality.
 
     Returns: detached scalar E_p(x)[KL(p(z | x) || q(z | x))] + H(z | x) where
@@ -315,7 +314,7 @@ def get_inference_network_discrepancy(generative_model, inference_network,
                                  num_samples).detach()
 
 
-def get_generative_model_discrepancy(true_generative_model, generative_model):
+def get_p_error(true_generative_model, generative_model):
     """Average KL between true and learned productions probs."""
 
     true_generative_model_probs = get_production_probs(true_generative_model)
