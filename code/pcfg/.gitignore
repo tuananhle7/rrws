@@ -3,3 +3,5 @@ models/
 plots/
 *.ipynb
 *.pyc
+cp_from_ubc.sh
+cp_to_home.sh
