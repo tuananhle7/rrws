@@ -9,6 +9,7 @@ import losses
 import pickle
 import uuid
 import datetime
+import numpy as np
 
 
 def lognormexp(values, dim=0):
@@ -183,12 +184,12 @@ def save_models(generative_model, inference_network, pcfg_path,
         os.makedirs(model_folder)
 
     torch.save(generative_model.state_dict(), generative_model_path)
-    print('Saved to {}'.format(generative_model_path))
+    print_with_time('Saved to {}'.format(generative_model_path))
     torch.save(inference_network.state_dict(), inference_network_path)
-    print('Saved to {}'.format(inference_network_path))
+    print_with_time('Saved to {}'.format(inference_network_path))
     with open(pcfg_path_path, 'w') as f:
         f.write(pcfg_path)
-    print('Saved to {}'.format(pcfg_path_path))
+    print_with_time('Saved to {}'.format(pcfg_path_path))
 
 
 def load_models(model_folder='.'):
@@ -204,9 +205,9 @@ def load_models(model_folder='.'):
     generative_model = models.GenerativeModel(grammar)
     inference_network = models.InferenceNetwork(grammar)
     generative_model.load_state_dict(torch.load(generative_model_path))
-    print('Loaded from {}'.format(generative_model_path))
+    print_with_time('Loaded from {}'.format(generative_model_path))
     inference_network.load_state_dict(torch.load(inference_network_path))
-    print('Loaded from {}'.format(inference_network_path))
+    print_with_time('Loaded from {}'.format(inference_network_path))
 
     return generative_model, inference_network
 
@@ -338,7 +339,7 @@ def save_object(obj, filename):
 
     with open(filename, 'wb') as output:
         pickle.dump(obj, output, pickle.HIGHEST_PROTOCOL)
-    print('Saved to {}'.format(filename))
+    print_with_time('Saved to {}'.format(filename))
 
 
 def load_object(filename):
@@ -357,6 +358,10 @@ def get_uuid():
 
 def get_yyyymmdd():
     return str(datetime.date.today()).replace('-', '')
+
+
+def get_hhmmss():
+    return datetime.datetime.now().strftime('%H:%M:%S')
 
 
 def get_model_folder(rootdir='./models/'):
@@ -391,3 +396,12 @@ def list_model_folders_args_match(rootdir='./models/', **kwargs):
         if args_match(model_folder, **kwargs):
             result.append(model_folder)
     return result
+
+
+def print_with_time(str):
+    print(get_yyyymmdd() + ' ' + get_hhmmss() + ' ' + str)
+
+
+def set_seed(seed):
+    torch.manual_seed(seed)
+    np.random.seed(seed)

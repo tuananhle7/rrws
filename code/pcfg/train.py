@@ -28,7 +28,8 @@ class TrainSleepCallback():
     def __call__(self, iteration, sleep_loss, generative_model,
                  inference_network, optimizer):
         if iteration % self.logging_interval == 0:
-            print('Iteration {}: loss = {:.3f}'.format(iteration, sleep_loss))
+            util.print_with_time('Iteration {}: loss = {:.3f}'.format(
+                iteration, sleep_loss))
             self.sleep_loss_history.append(sleep_loss)
 
 
@@ -90,9 +91,10 @@ class TrainWakeSleepCallback():
                  generative_model, inference_network, optimizer_theta,
                  optimizer_phi):
         if iteration % self.logging_interval == 0:
-            print('Iteration {} losses: theta = {:.3f}, phi = {:.3f}, '
-                  'elbo = {:.3f}'.format(iteration, wake_theta_loss,
-                                         sleep_phi_loss, elbo))
+            util.print_with_time(
+                'Iteration {} losses: theta = {:.3f}, phi = {:.3f}, elbo = '
+                '{:.3f}'.format(iteration, wake_theta_loss, sleep_phi_loss,
+                                elbo))
             self.wake_theta_loss_history.append(wake_theta_loss)
             self.sleep_phi_loss_history.append(sleep_phi_loss)
             self.elbo_history.append(elbo)
@@ -110,11 +112,12 @@ class TrainWakeSleepCallback():
                 self.true_generative_model, inference_network))
             self.q_error_to_model_history.append(util.get_q_error(
                 generative_model, inference_network))
-            print('Iteration {} p_error = {:.3f}, q_error_to_true = {:.3f}, '
-                  'q_error_to_model = {:.3f}'.format(
-                      iteration, self.p_error_history[-1],
-                      self.q_error_to_true_history[-1],
-                      self.q_error_to_model_history[-1]))
+            util.print_with_time(
+                'Iteration {} p_error = {:.3f}, q_error_to_true = {:.3f}, '
+                'q_error_to_model = {:.3f}'.format(
+                    iteration, self.p_error_history[-1],
+                    self.q_error_to_true_history[-1],
+                    self.q_error_to_model_history[-1]))
 
 
 def train_wake_wake(generative_model, inference_network,
@@ -177,9 +180,10 @@ class TrainWakeWakeCallback():
                  generative_model, inference_network, optimizer_theta,
                  optimizer_phi):
         if iteration % self.logging_interval == 0:
-            print('Iteration {} losses: theta = {:.3f}, phi = {:.3f}, '
-                  'elbo = {:.3f}'.format(iteration, wake_theta_loss,
-                                         wake_phi_loss, elbo))
+            util.print_with_time(
+                'Iteration {} losses: theta = {:.3f}, phi = {:.3f}, elbo = '
+                '{:.3f}'.format(iteration, wake_theta_loss, wake_phi_loss,
+                                elbo))
             self.wake_theta_loss_history.append(wake_theta_loss)
             self.wake_phi_loss_history.append(wake_phi_loss)
             self.elbo_history.append(elbo)
@@ -197,11 +201,12 @@ class TrainWakeWakeCallback():
                 self.true_generative_model, inference_network))
             self.q_error_to_model_history.append(util.get_q_error(
                 generative_model, inference_network))
-            print('Iteration {} p_error = {:.3f}, q_error_to_true = {:.3f}, '
-                  'q_error_to_model = {:.3f}'.format(
-                      iteration, self.p_error_history[-1],
-                      self.q_error_to_true_history[-1],
-                      self.q_error_to_model_history[-1]))
+            util.print_with_time(
+                'Iteration {} p_error = {:.3f}, q_error_to_true = {:.3f}, '
+                'q_error_to_model = {:.3f}'.format(
+                    iteration, self.p_error_history[-1],
+                    self.q_error_to_true_history[-1],
+                    self.q_error_to_model_history[-1]))
 
 
 def train_iwae(algorithm, generative_model, inference_network,
@@ -260,8 +265,9 @@ class TrainIwaeCallback():
     def __call__(self, iteration, loss, elbo, generative_model,
                  inference_network, optimizer):
         if iteration % self.logging_interval == 0:
-            print('Iteration {} loss = {:.3f}, elbo = {:.3f}'.format(
-                  iteration, loss, elbo))
+            util.print_with_time(
+                'Iteration {} loss = {:.3f}, elbo = {:.3f}'.format(
+                    iteration, loss, elbo))
             self.loss_history.append(loss)
             self.elbo_history.append(elbo)
 
@@ -278,8 +284,9 @@ class TrainIwaeCallback():
                 self.true_generative_model, inference_network))
             self.q_error_to_model_history.append(util.get_q_error(
                 generative_model, inference_network))
-            print('Iteration {} p_error = {:.3f}, q_error_to_true = {:.3f}, '
-                  'q_error_to_model = {:.3f}'.format(
-                      iteration, self.p_error_history[-1],
-                      self.q_error_to_true_history[-1],
-                      self.q_error_to_model_history[-1]))
+            util.print_with_time(
+                'Iteration {} p_error = {:.3f}, q_error_to_true = {:.3f}, '
+                'q_error_to_model = {:.3f}'.format(
+                    iteration, self.p_error_history[-1],
+                    self.q_error_to_true_history[-1],
+                    self.q_error_to_model_history[-1]))

@@ -1,6 +1,5 @@
 import util
 import train
-import os
 
 
 def get_models(load_model_folder, pcfg_path):
@@ -24,7 +23,7 @@ def get_models(load_model_folder, pcfg_path):
 
 
 def run(args):
-    print(args)
+    util.print_with_time(str(args))
 
     # save args
     model_folder = util.get_model_folder()
@@ -32,6 +31,7 @@ def run(args):
     util.save_object(args, args_filename)
 
     # init models
+    util.set_seed(args.seed)
     generative_model, inference_network, true_generative_model = get_models(
         args.load_model_folder, args.pcfg_path)
 
@@ -91,6 +91,7 @@ if __name__ == '__main__':
                         help=' ')
     parser.add_argument('--num-particles', type=int, default=20,
                         help=' ')
+    parser.add_argument('--seed', type=int, default=1, help=' ')
     parser.add_argument('--pcfg-path', default='./pcfgs/astronomers_pcfg.json',
                         help=' ')
     args = parser.parse_args()
