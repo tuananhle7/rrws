@@ -1,6 +1,6 @@
 #!/bin/bash
 
-#PBS -N test
+#PBS -N rws-pcfg
 #PBS -M tuananh@robots.ox.ac.uk
 #PBS -m abe
 #PBS -q parallel
@@ -18,6 +18,7 @@ EVAL_INTERVAL=$4
 CHECKPOINT_INTERVAL=$5
 BATCH_SIZE=$6
 NUM_PARTICLES=$7
+SEED=$8
 
 echo `date +%Y-%m-%d_%H:%M:%S` build docker image
 docker build -t rws-pcfg .
@@ -35,7 +36,8 @@ docker exec $id python -u run.py --train-mode $TRAIN_MODE \
                                  --eval-interval $EVAL_INTERVAL \
                                  --checkpoint-interval $CHECKPOINT_INTERVAL \
                                  --batch-size $BATCH_SIZE \
-                                 --num-particles $NUM_PARTICLES
+                                 --num-particles $NUM_PARTICLES \
+                                 --seed $SEED
 
 echo `date +%Y-%m-%d_%H:%M:%S` copy models/ from docker container
 docker cp -a $id:/workspace/models/ .
