@@ -3,7 +3,7 @@
 #PBS -N test
 #PBS -M tuananh@robots.ox.ac.uk
 #PBS -m abe
-#PBS -q nice
+#PBS -q parallel
 
 # Set output and error directories
 #PBS -o ./jobs_out_err/test_${PBS_JOBID}.out
