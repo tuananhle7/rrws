@@ -9,9 +9,7 @@
 #PBS -o ./jobs_out_err/test_${PBS_JOBID}.out
 #PBS -e ./jobs_out_err/test_${PBS_JOBID}.err
 
-if [ "$SSH_CONNECTION" ]; then
-  cd /ubc/cs/research/plai-scratch/tuananh/rwspp/code/pcfg
-fi
+cd /ubc/cs/research/plai-scratch/tuananh/rwspp/code/pcfg
 
 TRAIN_MODE=$1
 NUM_ITERATIONS=$2
