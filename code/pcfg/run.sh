@@ -3,11 +3,11 @@
 #PBS -N rws-pcfg
 #PBS -M tuananh@robots.ox.ac.uk
 #PBS -m abe
-#PBS -q parallel
+#PBS -q nice
 
 # Set output and error directories
-#PBS -o ./jobs_out_err/test_${PBS_JOBID}.out
-#PBS -e ./jobs_out_err/test_${PBS_JOBID}.err
+#PBS -o ./jobs_out_err/rws_pcfg_${PBS_JOBID}.out
+#PBS -e ./jobs_out_err/rws_pcfg_${PBS_JOBID}.err
 
 cd /ubc/cs/research/plai-scratch/tuananh/rwspp/code/pcfg
 
