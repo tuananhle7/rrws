@@ -10,10 +10,11 @@ def main():
     for seed in [1, 2, 3, 4, 5]:
         for train_mode in ['ws', 'vimco', 'ww']:
             for num_particles in [2, 3, 4]:
-                subprocess.call('qsub run.sh ws {} {} {} {} {} {} {}'.format(
-                    train_mode, num_iterations, logging_interval,
-                    eval_interval, checkpoint_interval, batch_size,
-                    num_particles), shell=True)
+                subprocess.call(
+                    'qsub -v ws {} {} {} {} {} {} {} run.sh'.format(
+                        train_mode, num_iterations, logging_interval,
+                        eval_interval, checkpoint_interval, batch_size,
+                        num_particles), shell=True)
 
 
 if __name__ == '__main__':
