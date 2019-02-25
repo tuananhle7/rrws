@@ -26,13 +26,16 @@ def get_models(load_model_folder, pcfg_path):
 def run(args):
     print(args)
 
+    # save args
+    model_folder = util.get_model_folder()
+    args_filename = util.get_args_filename(model_folder)
+    util.save_object(args, args_filename)
+
     # init models
     generative_model, inference_network, true_generative_model = get_models(
         args.load_model_folder, args.pcfg_path)
 
     # train
-    model_folder = os.path.join('./trained_models/', args.train_mode)
-    stats_filename = util.get_stats_filename(model_folder)
     if args.train_mode == 'ww':
         train_callback = train.TrainWakeWakeCallback(
             args.pcfg_path, model_folder, true_generative_model,
@@ -42,8 +45,6 @@ def run(args):
                               true_generative_model, args.batch_size,
                               args.num_iterations, args.num_particles,
                               train_callback)
-        stats_filename = util.get_stats_filename(model_folder)
-        util.save_object(train_callback, stats_filename)
     elif args.train_mode == 'ws':
         train_callback = train.TrainWakeSleepCallback(
             args.pcfg_path, model_folder, true_generative_model,
@@ -53,8 +54,6 @@ def run(args):
                                true_generative_model, args.batch_size,
                                args.num_iterations, args.num_particles,
                                train_callback)
-        stats_filename = util.get_stats_filename(model_folder)
-        util.save_object(train_callback, stats_filename)
     elif args.train_mode == 'reinforce' or args.train_mode == 'vimco':
         train_callback = train.TrainIwaeCallback(
             args.pcfg_path, model_folder, true_generative_model,
@@ -68,6 +67,7 @@ def run(args):
     # save models and stats
     util.save_models(generative_model, inference_network, args.pcfg_path,
                      model_folder)
+    stats_filename = util.get_stats_filename(model_folder)
     util.save_object(train_callback, stats_filename)
 
 

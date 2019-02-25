@@ -1,1 +1,0 @@
-./pcfgs/astronomers_pcfg.json

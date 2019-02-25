@@ -7,6 +7,8 @@ import string
 import Levenshtein
 import losses
 import pickle
+import uuid
+import datetime
 
 
 def lognormexp(values, dim=0):
@@ -347,3 +349,45 @@ def load_object(filename):
 
 def get_stats_filename(model_folder='.'):
     return os.path.join(model_folder, 'stats.pkl')
+
+
+def get_uuid():
+    return str(uuid.uuid4())[:8]
+
+
+def get_yyyymmdd():
+    return str(datetime.date.today()).replace('-', '')
+
+
+def get_model_folder(rootdir='./models/'):
+    return os.path.join(rootdir, get_yyyymmdd() + '_' + get_uuid())
+
+
+def get_args_filename(model_folder='.'):
+    return os.path.join(model_folder, 'args.pkl')
+
+
+def args_match(model_folder, **kwargs):
+    """Do training args match kwargs?"""
+
+    args_filename = get_args_filename(model_folder)
+    if os.path.exists(args_filename):
+        args = load_object(args_filename)
+        for k, v in kwargs.items():
+            if args.__dict__[k] != v:
+                return False
+        return True
+    else:
+        return False
+
+
+def list_model_folders_args_match(rootdir='./models/', **kwargs):
+    """Return a list of model folders whose training args
+    match kwargs.
+    """
+
+    result = []
+    for model_folder in list_subdirs(rootdir):
+        if args_match(model_folder, **kwargs):
+            result.append(model_folder)
+    return result
