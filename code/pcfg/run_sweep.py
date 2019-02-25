@@ -2,14 +2,14 @@ import subprocess
 
 
 def main():
-    num_iterations = 10
-    logging_interval = 1
-    eval_interval = 1
-    checkpoint_interval = 5
-    batch_size = 2
-    for seed in [1, 2, 3]:
+    num_iterations = 5000
+    logging_interval = 10
+    eval_interval = 10
+    checkpoint_interval = 100
+    batch_size = 10
+    for seed in [1, 2, 3, 4, 5]:
         for train_mode in ['ws', 'vimco', 'ww', 'reinforce']:
-            for num_particles in [2, 3]:
+            for num_particles in [5, 10, 20, 50, 100]:
                 subprocess.call(
                     'qsub -F \"{} {} {} {} {} {} {} {}\" run.sh'.format(
                         train_mode, num_iterations, logging_interval,
