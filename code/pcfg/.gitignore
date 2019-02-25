@@ -1,3 +1,5 @@
+jobs_out_err/
 models/
 plots/
 *.ipynb
+*.pyc
