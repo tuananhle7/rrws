@@ -124,11 +124,15 @@ def word_to_one_hot(word, terminals):
         word: string
         terminals: set of terminal strings
 
-    Returns: one hot tensor of shape [len(terminals)]
+    Returns: one hot tensor of shape [len(terminals)] or zeros if word is not
+        in terminals
     """
     num_bins = len(terminals)
-    i = sorted(terminals).index(word)
-    return one_hot(torch.tensor([i]), num_bins)[0]
+    try:
+        i = sorted(terminals).index(word)
+        return one_hot(torch.tensor([i]), num_bins)[0]
+    except ValueError:
+        return torch.zeros((num_bins,))
 
 
 def sentence_to_one_hots(sentence, terminals):
@@ -219,10 +223,13 @@ def word_to_index(word, terminals):
         word: string
         terminals: set of terminal strings
 
-    Returns: int
+    Returns: int; -1 if word is not in terminals
     """
 
-    return sorted(terminals).index(word)
+    try:
+        return sorted(terminals).index(word)
+    except ValueError:
+        return -1
 
 
 def sentence_to_indices(sentence, terminals):
@@ -232,7 +239,8 @@ def sentence_to_indices(sentence, terminals):
         sentence: list of strings
         terminals: set of terminal strings
 
-    Returns: list of indices of length len(sentence)
+    Returns: list of indices of length len(sentence); index is -1 if word is
+        not in terminals
     """
     return [word_to_index(word, terminals) for word in sentence]
 
@@ -251,7 +259,7 @@ def get_levenshtein_distance(sentence_1, sentence_2, terminals):
     Args:
         sentence_1: list of strings
         sentence_2: list of strings
-        terminal: vocabulary; list of valid strings
+        terminals: vocabulary; list of valid strings
 
     Returns: int"""
     return Levenshtein.distance(_sentence_to_string(sentence_1, terminals),
@@ -384,6 +392,13 @@ def args_match(model_folder, **kwargs):
         return True
     else:
         return False
+
+
+def list_subdirs(rootdir):
+    for file in os.listdir(rootdir):
+        path = os.path.join(rootdir, file)
+        if os.path.isdir(path):
+            yield(path)
 
 
 def list_model_folders_args_match(rootdir='./models/', **kwargs):

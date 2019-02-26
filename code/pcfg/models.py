@@ -17,7 +17,7 @@ class GenerativeModel(nn.Module):
                 k: nn.Parameter(torch.log(v))
                 for k, v in production_probs_init.items()})
 
-    def sample_tree(self, symbol=None):
+    def sample_tree(self, symbol=None, depth=0, max_depth=100):
         """Sample tree from prior.
 
         Args: start symbol
@@ -29,11 +29,14 @@ class GenerativeModel(nn.Module):
 
         if symbol in self.grammar['terminals']:
             return symbol
+        elif depth > max_depth:
+            return symbol
         else:
             dist = Categorical(logits=self.production_logits[symbol])
             production_index = dist.sample().detach()
             production = self.grammar['productions'][symbol][production_index]
-            return [symbol] + [self.sample_tree(s) for s in production]
+            return [symbol] + \
+                [self.sample_tree(s, depth=depth + 1) for s in production]
 
     def get_tree_log_prob(self, tree):
         """Log probability of tree.
@@ -219,7 +222,7 @@ class InferenceNetwork(nn.Module):
 
     def sample_tree(self, symbol=None, sentence_embedding=None,
                     previous_sample_embedding=None, inference_hidden=None,
-                    sentence=None):
+                    sentence=None, depth=0, max_depth=100):
         """Samples a tree given a sentence and a start symbol (can be terminal
             or non-terminal).
 
@@ -249,6 +252,8 @@ class InferenceNetwork(nn.Module):
 
         if symbol in self.grammar['terminals']:
             return symbol
+        elif depth > max_depth:
+            return symbol
         else:
             sample_address_embedding = util.get_sample_address_embedding(
                 symbol, self.grammar['non_terminals'])
@@ -264,5 +269,5 @@ class InferenceNetwork(nn.Module):
 
             return [symbol] + [
                 self.sample_tree(s, sentence_embedding, sample_embedding,
-                                 inference_gru_output)
+                                 inference_gru_output, depth=depth + 1)
                 for s in production]
