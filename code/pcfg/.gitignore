@@ -5,3 +5,4 @@ plots/
 *.pyc
 cp_from_ubc.sh
 cp_to_home.sh
+runs.txt
