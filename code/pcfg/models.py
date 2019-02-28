@@ -36,7 +36,8 @@ class GenerativeModel(nn.Module):
             production_index = dist.sample().detach()
             production = self.grammar['productions'][symbol][production_index]
             return [symbol] + \
-                [self.sample_tree(s, depth=depth + 1) for s in production]
+                [self.sample_tree(s, depth=depth + 1, max_depth=max_depth)
+                 for s in production]
 
     def get_tree_log_prob(self, tree):
         """Log probability of tree.
@@ -269,5 +270,6 @@ class InferenceNetwork(nn.Module):
 
             return [symbol] + [
                 self.sample_tree(s, sentence_embedding, sample_embedding,
-                                 inference_gru_output, depth=depth + 1)
+                                 inference_gru_output, depth=depth + 1,
+                                 max_depth=max_depth)
                 for s in production]
