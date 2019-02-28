@@ -4,5 +4,6 @@ plots/
 *.ipynb
 *.pyc
 cp_from_ubc.sh
+cp_from_arc.sh
 cp_to_home.sh
 runs.txt
