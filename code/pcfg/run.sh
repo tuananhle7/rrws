@@ -4,6 +4,7 @@
 #PBS -M tuananh@robots.ox.ac.uk
 #PBS -m abe
 #PBS -q nice
+#PBS -l nodes=node0+nodea+nodeb+nodec+noded
 
 # Set output and error directories
 #PBS -o ./jobs_out_err/rws_pcfg_${PBS_JOBID}.out
