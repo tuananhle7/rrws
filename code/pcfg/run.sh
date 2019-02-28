@@ -24,10 +24,7 @@ echo `date +%Y-%m-%d_%H:%M:%S` build docker image
 docker build -t rws-pcfg .
 
 echo `date +%Y-%m-%d_%H:%M:%S` start docker container
-id=$(docker run -it -d rws-pcfg)
-
-echo `date +%Y-%m-%d_%H:%M:%S` copy files to docker container
-docker cp -a . $id:/workspace/
+id=$(docker run -it -d --rm -v $PWD:/workspace rws-pcfg)
 
 echo `date +%Y-%m-%d_%H:%M:%S` run run.py in docker container
 docker exec $id python -u run.py --train-mode $TRAIN_MODE \
@@ -37,13 +34,7 @@ docker exec $id python -u run.py --train-mode $TRAIN_MODE \
                                  --checkpoint-interval $CHECKPOINT_INTERVAL \
                                  --batch-size $BATCH_SIZE \
                                  --num-particles $NUM_PARTICLES \
-                                 --seed $SEED
-
-echo `date +%Y-%m-%d_%H:%M:%S` copy models/ from docker container
-docker cp -a $id:/workspace/models/ .
+                                 --seed $SEED 2>&1 | tee ./jobs_out_err/rws_pcfg_${PBS_JOBID}_temp.out_err
 
 echo `date +%Y-%m-%d_%H:%M:%S` stop docker container
 docker stop $id
-
-echo `date +%Y-%m-%d_%H:%M:%S` remove docker container
-docker rm $id
