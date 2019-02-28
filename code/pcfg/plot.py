@@ -52,7 +52,8 @@ def load_errors():
                     train_mode=train_mode,
                     num_particles=num_particles)
                 if len(model_folders) > 0:
-                    model_folder = model_folders[0]
+                    model_folder = model_folders[np.argmax(
+                        [os.stat(x).st_mtime for x in model_folders])]
                     stats = util.load_object(
                         util.get_stats_filename(model_folder))
                     p_error[
