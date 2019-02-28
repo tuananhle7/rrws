@@ -471,3 +471,56 @@ def empty_list_of_size(*sizes):
         return [None for _ in range(sizes[0])]
     else:
         return [empty_list_of_size(*sizes[1:]) for _ in range(sizes[0])]
+
+
+def eval_quadratic(tree, x):
+    if isinstance(tree, list):
+        root = tree[0]
+        subtrees = tree[1:]
+        if root == 'Q' or root == 'L':
+            if len(subtrees) == 3:
+                a, op, b = subtrees
+                if op == '+':
+                    return eval_quadratic(a, x) + eval_quadratic(b, x)
+                elif op == '-':
+                    return eval_quadratic(a, x) - eval_quadratic(b, x)
+                elif op == '*':
+                    return eval_quadratic(a, x) * eval_quadratic(b, x)
+                else:
+                    raise ArithmeticError
+            elif len(subtrees) == 1:
+                return eval_quadratic(subtrees[0], x)
+        elif root == 'N':
+            return eval_quadratic(subtrees[0], x)
+    else:
+        root = tree
+        if root == 'x':
+            return x
+        elif root == 'x**2':
+            return x**2
+        elif int(root) in range(1, 21):
+            return np.full_like(x, int(root))
+
+
+def eval_polynomial(tree, x):
+    if isinstance(tree, list):
+        root = tree[0]
+        subtrees = tree[1:]
+        if root == 'E':
+            a, op, b = subtrees
+            if op == '+':
+                return eval_polynomial(a, x) + eval_polynomial(b, x)
+            elif op == '-':
+                return eval_polynomial(a, x) - eval_polynomial(b, x)
+            elif op == '*':
+                return eval_polynomial(a, x) * eval_polynomial(b, x)
+            else:
+                raise ArithmeticError
+        elif root == 'E1' or root == 'N':
+            return eval_polynomial(subtrees[0], x)
+    else:
+        root = tree
+        if root == 'x':
+            return x
+        elif int(root) in range(1, 11):
+            return np.full_like(x, int(root))
