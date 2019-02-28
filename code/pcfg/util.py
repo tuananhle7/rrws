@@ -10,6 +10,7 @@ import pickle
 import uuid
 import datetime
 import numpy as np
+import nltk
 
 
 def lognormexp(values, dim=0):
@@ -420,3 +421,53 @@ def print_with_time(str):
 def set_seed(seed):
     torch.manual_seed(seed)
     np.random.seed(seed)
+
+
+def tree_to_string(tree):
+    return str(tree).replace('\'', '')\
+                    .replace(',', '')\
+                    .replace('[', '(')\
+                    .replace(']', ')')
+
+
+def tree_to_nltk_tree(tree):
+    return nltk.Tree.fromstring(tree_to_string(tree))
+
+
+def logaddexp(a, b):
+    """Returns log(exp(a) + exp(b))."""
+
+    torch.logsumexp(torch.cat([a.unsqueeze(0), b.unsqueeze(0)]), dim=0)
+
+
+def get_posterior(generative_model, inference_network, sentence,
+                  num_particles=100):
+    """Returns a sequence of (tree, log_weight) tuples sorted by
+    weight in a descending order. tree is a string representation
+    of a tree.
+    """
+
+    trees = [inference_network.sample_tree(sentence=sentence)
+             for _ in range(num_particles)]
+    log_weights = [(generative_model.get_log_prob(tree, sentence) -
+                    inference_network.get_tree_log_prob(
+                        tree, sentence=sentence)).detach()
+                   for tree in trees]
+    tree_log_weight_dict = dict()
+    for tree, log_weight in zip(trees, log_weights):
+        string_tree = tree_to_string(tree)
+        if string_tree in tree_log_weight_dict:
+            tree_log_weight_dict[string_tree] = torch.logsumexp(
+                torch.cat([tree_log_weight_dict[string_tree].unsqueeze(0),
+                           log_weight.unsqueeze(0)]), dim=0)
+        else:
+            tree_log_weight_dict[string_tree] = log_weight
+    return sorted(list(tree_log_weight_dict.items()),
+                  key=lambda x: x[1], reverse=True)
+
+
+def empty_list_of_size(*sizes):
+    if len(sizes) == 1:
+        return [None for _ in range(sizes[0])]
+    else:
+        return [empty_list_of_size(*sizes[1:]) for _ in range(sizes[0])]
