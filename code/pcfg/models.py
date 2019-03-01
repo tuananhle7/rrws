@@ -82,7 +82,8 @@ class GenerativeModel(nn.Module):
             return torch.zeros(())
 
     def get_sentence_log_likelihood(self, sentence, tree):
-        """Minus ABC distance instead of log p(sentence | tree).
+        """Minus ABC distance instead of log p(sentence | tree). ABC distance
+        is the Levenshtein distance.
 
         Args:
             sentence: list of strings
@@ -99,7 +100,7 @@ class GenerativeModel(nn.Module):
 
     def get_polynomial_log_likelihood(self, ys, tree):
         """Minus ABC distance instead of log p(ys | tree, xs) where xs is
-            torch.linspace(-10, 10, 100).
+            torch.linspace(-10, 10, 100). ABC distance is log(1 + mse).
 
         Args:
             ys: torch.tensor of shape [100]
