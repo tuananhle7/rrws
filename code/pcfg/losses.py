@@ -23,7 +23,7 @@ def get_log_weight_and_log_q(generative_model, inference_network, obss,
         generative_model: models.GenerativeModel object
         inference_network: models.InferenceNetwork object
         obss: list of obs each of which is either a sentence (list of strings)
-            or ys (tensor of shape [50])
+            or ys (tensor of shape [100])
         num_particles: int
 
     Returns:
@@ -64,7 +64,7 @@ def get_wake_theta_loss(generative_model, inference_network, obss,
         generative_model: models.GenerativeModel object
         inference_network: models.InferenceNetwork object
         obss: list of obs each of which is either a sentence (list of strings)
-            or ys (tensor of shape [50])
+            or ys (tensor of shape [100])
         num_particles: int
 
     Returns:
@@ -91,7 +91,7 @@ def get_wake_phi_loss(generative_model, inference_network, obss,
         generative_model: models.GenerativeModel object
         inference_network: models.InferenceNetwork object
         obss: list of obs each of which is either a sentence (list of strings)
-            or ys (tensor of shape [50])
+            or ys (tensor of shape [100])
         num_particles: int
 
     Returns:
@@ -109,7 +109,7 @@ def get_reinforce_loss(generative_model, inference_network, obss,
         generative_model: models.GenerativeModel object
         inference_network: models.InferenceNetwork object
         obss: list of obs each of which is either a sentence (list of strings)
-            or ys (tensor of shape [50])
+            or ys (tensor of shape [100])
         num_particles: int
 
     Returns:
