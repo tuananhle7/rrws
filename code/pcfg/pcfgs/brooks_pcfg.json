@@ -1,4 +1,5 @@
 {
+  "name": "brooks",
   "_info": "PCFG from the GrammarVAE paper",
   "terminals": ["x", "sin(", "exp(", "(", ")", "+", "*", "/", "1", "2", "3"],
   "non_terminals": ["S", "T"],

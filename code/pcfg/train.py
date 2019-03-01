@@ -42,14 +42,13 @@ def train_wake_sleep(generative_model, inference_network,
 
     for iteration in range(num_iterations):
         # generate synthetic data
-        sentences = [util.get_leaves(true_generative_model.sample_tree())
-                     for _ in range(batch_size)]
+        obss = [true_generative_model.sample_obs() for _ in range(batch_size)]
 
         # wake theta
         optimizer_phi.zero_grad()
         optimizer_theta.zero_grad()
         wake_theta_loss, elbo = losses.get_wake_theta_loss(
-            generative_model, inference_network, sentences, num_particles)
+            generative_model, inference_network, obss, num_particles)
         wake_theta_loss.backward()
         optimizer_theta.step()
 
@@ -128,11 +127,10 @@ def train_wake_wake(generative_model, inference_network,
 
     for iteration in range(num_iterations):
         # generate synthetic data
-        sentences = [util.get_leaves(true_generative_model.sample_tree())
-                     for _ in range(batch_size)]
+        obss = [true_generative_model.sample_obs() for _ in range(batch_size)]
 
         log_weight, log_q = losses.get_log_weight_and_log_q(
-            generative_model, inference_network, sentences, num_particles)
+            generative_model, inference_network, obss, num_particles)
 
         # wake theta
         optimizer_phi.zero_grad()
@@ -224,17 +222,16 @@ def train_iwae(algorithm, generative_model, inference_network,
 
     for iteration in range(num_iterations):
         # generate synthetic data
-        sentences = [util.get_leaves(true_generative_model.sample_tree())
-                     for _ in range(batch_size)]
+        obss = [true_generative_model.sample_obs() for _ in range(batch_size)]
 
         # wake theta
         optimizer.zero_grad()
         if algorithm == 'vimco':
             loss, elbo = losses.get_vimco_loss(
-                generative_model, inference_network, sentences, num_particles)
+                generative_model, inference_network, obss, num_particles)
         elif algorithm == 'reinforce':
             loss, elbo = losses.get_reinforce_loss(
-                generative_model, inference_network, sentences, num_particles)
+                generative_model, inference_network, obss, num_particles)
         loss.backward()
         optimizer.step()
 

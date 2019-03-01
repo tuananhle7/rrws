@@ -1,4 +1,5 @@
 {
+  "name": "astronomers",
   "terminals": ["astronomers", "ears", "saw", "stars", "telescopes", "with"],
   "non_terminals": ["S", "NP", "VP", "PP", "P", "V"],
   "productions": {

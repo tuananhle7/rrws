@@ -2,7 +2,7 @@ import util
 import train
 
 
-def get_models(load_model_folder, pcfg_path):
+def load_or_init_models(load_model_folder, pcfg_path):
     """Load/initialize models.
 
     Args:
@@ -32,8 +32,8 @@ def run(args):
 
     # init models
     util.set_seed(args.seed)
-    generative_model, inference_network, true_generative_model = get_models(
-        args.load_model_folder, args.pcfg_path)
+    generative_model, inference_network, true_generative_model = \
+        load_or_init_models(args.load_model_folder, args.pcfg_path)
 
     # train
     if args.train_mode == 'ww':

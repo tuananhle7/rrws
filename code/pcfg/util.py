@@ -11,6 +11,8 @@ import uuid
 import datetime
 import numpy as np
 import nltk
+import matplotlib.pyplot as plt
+import seaborn as sns
 
 
 def lognormexp(values, dim=0):
@@ -171,7 +173,8 @@ def read_pcfg(pcfg_path):
         'terminals': set(data['terminals']),
         'non_terminals': set(data['non_terminals']),
         'productions': data['productions'],
-        'start_symbol': data['start_symbol']
+        'start_symbol': data['start_symbol'],
+        'name': data['name']
     }
     true_production_probs = production_probs_to_tensor(
         data['production_probs'])
@@ -499,7 +502,7 @@ def eval_quadratic(tree, x):
         elif root == 'x**2':
             return x**2
         elif int(root) in range(1, 21):
-            return np.full_like(x, int(root))
+            return torch.full_like(x, int(root), dtype=torch.float)
 
 
 def eval_polynomial(tree, x):
@@ -522,5 +525,57 @@ def eval_polynomial(tree, x):
         root = tree
         if root == 'x':
             return x
-        elif int(root) in range(1, 11):
-            return np.full_like(x, int(root))
+        elif int(root) in range(1, 4):
+            return torch.full_like(x, int(root), dtype=torch.float)
+
+
+def mse(ys1, ys2):
+    return torch.mean((ys1 - ys2)**2)
+
+
+def fig2rgba(fig):
+    """Convert a Matplotlib figure to a 4D numpy array with RGBA channels and
+        return it. From
+        http://www.icare.univ-lille1.fr/tutorials/convert_a_matplotlib_figure
+
+    Args:
+        fig: a matplotlib figure
+
+    Returns: a numpy 3D array of RGBA values of shape [w, h, 4]
+    """
+
+    fig.canvas.draw()
+    w, h = fig.canvas.get_width_height()
+    rgba = np.frombuffer(fig.canvas.tostring_argb(), dtype=np.uint8)
+    rgba.shape = (w, h, 4)
+    rgba = np.roll(rgba, 3, axis=2)
+    plt.close(fig)
+
+    return rgba
+
+
+def rgba2gray(rgba):
+    # from https://stackoverflow.com/a/12201744/1357509
+    return np.dot(rgba[..., :3], [0.299, 0.587, 0.114])
+
+
+# This functions needs to be optimized
+def xsys2gray(xs, ys):
+    """Args:
+        xs: tensor of shape [100]
+        ys: tensor of shape [100]
+
+    Returns: grayscale image repr. by tensor of shape
+        [100, 100] where 1 is white and 0 is black"""
+
+    fig, ax = plt.subplots(1, 1, figsize=(1, 1), dpi=100)
+    ax.plot(xs.numpy(), ys.numpy(), color='black')
+    ax.set_xticks([])
+    ax.set_yticks([])
+    ax.set_ylim(-100, 100)
+    ax.set_xlim(-10, 10)
+    sns.despine(ax=ax, left=True, bottom=True)
+    fig.tight_layout(pad=0)
+
+    return torch.tensor(rgba2gray(fig2rgba(fig)) / 255.0,
+                        dtype=torch.float)

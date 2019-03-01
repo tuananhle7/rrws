@@ -20,6 +20,7 @@ CHECKPOINT_INTERVAL=$5
 BATCH_SIZE=$6
 NUM_PARTICLES=$7
 SEED=$8
+PCFG_PATH=$9
 
 echo `date +%Y-%m-%d_%H:%M:%S` build docker image
 docker build -t rws-pcfg .
@@ -35,7 +36,8 @@ docker exec $id python -u run.py --train-mode $TRAIN_MODE \
                                  --checkpoint-interval $CHECKPOINT_INTERVAL \
                                  --batch-size $BATCH_SIZE \
                                  --num-particles $NUM_PARTICLES \
-                                 --seed $SEED 2>&1 | tee ./jobs_out_err/rws_pcfg_${PBS_JOBID}_temp.out_err
+                                 --seed $SEED \
+                                 --pcfg_path $PCFG_PATH 2>&1 | tee ./jobs_out_err/rws_pcfg_${PBS_JOBID}_temp.out_err
 
 echo `date +%Y-%m-%d_%H:%M:%S` stop docker container
 docker stop $id

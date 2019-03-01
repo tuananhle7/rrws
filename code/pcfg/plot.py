@@ -5,14 +5,23 @@ import numpy as np
 import os
 import matplotlib.lines as mlines
 
-num_iterations = 5000
+# num_iterations = 5000
+# logging_interval = 10
+# eval_interval = 10
+# checkpoint_interval = 100
+# batch_size = 10
+# seed_list = [1, 2, 3, 4, 5]
+# train_mode_list = ['reinforce', 'ws', 'vimco', 'ww']
+# num_particles_list = [5, 10, 20, 50, 100]
+
+num_iterations = 2000
 logging_interval = 10
 eval_interval = 10
 checkpoint_interval = 100
-batch_size = 10
-seed_list = [1, 2, 3, 4, 5]
+batch_size = 2
+seed_list = [1, 2, 3, 4, 5, 6]
 train_mode_list = ['reinforce', 'ws', 'vimco', 'ww']
-num_particles_list = [5, 10, 20, 50, 100]
+num_particles_list = [2, 5, 10, 20, 50]
 
 
 def plot_with_error_bars(ax, data, **plot_kwargs):
@@ -101,6 +110,13 @@ def plot_errors():
     axss[0, 0].set_ylabel(r'$p_{\theta}$ error', labelpad=-17)
     axss[1, 0].set_ylabel(r'$q_\phi$ error to $p_{\theta}$', labelpad=-5)
     axss[2, 0].set_ylabel(r'$q_\phi$ error to $p_{true}$', labelpad=-15)
+
+    for ax in axss[0]:
+        ax.set_ylim(0, 0.3)
+    for ax in axss[1]:
+        ax.set_ylim(0, 20)
+    for ax in axss[-1]:
+        ax.set_ylim(0, 40)
 
     for axs in axss:
         for ax in axs:
