@@ -443,18 +443,17 @@ def logaddexp(a, b):
     torch.logsumexp(torch.cat([a.unsqueeze(0), b.unsqueeze(0)]), dim=0)
 
 
-def get_posterior(generative_model, inference_network, sentence,
-                  num_particles=100):
+def get_posterior(generative_model, inference_network, obs, num_particles=100):
     """Returns a sequence of (tree, log_weight) tuples sorted by
     weight in a descending order. tree is a string representation
     of a tree.
     """
 
-    trees = [inference_network.sample_tree(sentence=sentence)
+    trees = [inference_network.sample_tree(obs=obs)
              for _ in range(num_particles)]
-    log_weights = [(generative_model.get_log_prob(tree, sentence) -
+    log_weights = [(generative_model.get_log_prob(tree, obs) -
                     inference_network.get_tree_log_prob(
-                        tree, sentence=sentence)).detach()
+                        tree, obs=obs)).detach()
                    for tree in trees]
     tree_log_weight_dict = dict()
     for tree, log_weight in zip(trees, log_weights):
