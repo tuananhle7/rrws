@@ -21,7 +21,6 @@ BATCH_SIZE=$6
 NUM_PARTICLES=$7
 SEED=$8
 PCFG_PATH=$9
-EXP_LEV=$10
 
 echo `date +%Y-%m-%d_%H:%M:%S` build docker image
 docker build -t rws-pcfg .
@@ -39,7 +38,7 @@ docker exec $id python -u run.py --train-mode $TRAIN_MODE \
                                  --num-particles $NUM_PARTICLES \
                                  --seed $SEED \
                                  --pcfg-path $PCFG_PATH \
-                                 --exp-levenshtein $EXP_LEV 2>&1 | tee ./jobs_out_err/rws_pcfg_${PBS_JOBID}_temp.out_err
+                                 --exp-levenshtein 2>&1 | tee ./jobs_out_err/rws_pcfg_${PBS_JOBID}_temp.out_err
 
 echo `date +%Y-%m-%d_%H:%M:%S` stop docker container
 docker stop $id
