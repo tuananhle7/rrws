@@ -94,5 +94,7 @@ if __name__ == '__main__':
     parser.add_argument('--seed', type=int, default=1, help=' ')
     parser.add_argument('--pcfg-path', default='./pcfgs/astronomers_pcfg.json',
                         help=' ')
+    parser.add_argument('--exp-levenshtein', dest='exp_levenshtein',
+                        action='store_true', default=False)
     args = parser.parse_args()
     run(args)

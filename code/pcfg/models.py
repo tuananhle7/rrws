@@ -96,7 +96,8 @@ class GenerativeModel(nn.Module):
             util.get_levenshtein_distance(sentence_from_tree, sentence,
                                           self.grammar['terminals']),
             dtype=torch.float)
-        return -levenshtein_distance
+        return -(torch.exp(levenshtein_distance) - 1)
+        # return -levenshtein_distance
 
     def get_polynomial_log_likelihood(self, ys, tree):
         """Minus ABC distance instead of log p(ys | tree, xs) where xs is

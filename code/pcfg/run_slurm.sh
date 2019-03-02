@@ -19,6 +19,7 @@ BATCH_SIZE=$6
 NUM_PARTICLES=$7
 SEED=$8
 PCFG_PATH=$9
+EXP_LEV=$10
 
 module load python/anaconda3/5.0.1
 source activate $HOME/torch-env
@@ -32,4 +33,5 @@ python -u run.py --train-mode $TRAIN_MODE \
                  --batch-size $BATCH_SIZE \
                  --num-particles $NUM_PARTICLES \
                  --seed $SEED \
-                 --pcfg_path $PCFG_PATH 2>&1 | tee ./jobs_out_err/rws_pcfg_${PBS_JOBID}_temp.out_err
+                 --pcfg-path $PCFG_PATH \
+                 --exp-levenshtein $EXP_LEV 2>&1 | tee ./jobs_out_err/rws_pcfg_${PBS_JOBID}_temp.out_err
