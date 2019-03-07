@@ -47,8 +47,8 @@ class OnlineMeanStd():
                 np.sum([torch.sum(p) for p in stds]) / num_parameters)
 
 
-def get_mean_stds_new(generative_model, inference_network, num_mc_samples,
-                      obss, num_particles):
+def get_mean_stds(generative_model, inference_network, num_mc_samples, obss,
+                  num_particles):
     vimco_grad = OnlineMeanStd()
     vimco_one_grad = OnlineMeanStd()
     reinforce_grad = OnlineMeanStd()
@@ -147,47 +147,7 @@ def get_mean_stds_new(generative_model, inference_network, num_mc_samples,
          log_Q_grad, sleep_loss_grad]))
 
 
-def get_mean_stds(generative_model, inference_network, num_mc_samples,
-                  obss, num_particles, train_mode):
-    p_grad_mean_std = OnlineMeanStd()
-    q_grad_mean_std = OnlineMeanStd()
-    log_evidence_mean_std = OnlineMeanStd()
-    for mc_sample_idx in range(num_mc_samples):
-        util.print_with_time('MC sample {}'.format(mc_sample_idx))
-        inference_network.zero_grad()
-        generative_model.zero_grad()
-        if train_mode == 'vimco':
-            loss, elbo = losses.get_vimco_loss(
-                generative_model, inference_network, obss, num_particles)
-            log_evidence = elbo
-        elif train_mode == 'reinforce':
-            loss, elbo = losses.get_reinforce_loss(
-                generative_model, inference_network, obss, num_particles)
-            log_evidence = elbo
-        elif train_mode == 'ww':
-            log_weight, log_q = losses.get_log_weight_and_log_q(
-                generative_model, inference_network, obss, num_particles)
-            loss = losses.get_wake_phi_loss_from_log_weight_and_log_q(
-                log_weight, log_q)
-            log_evidence = torch.mean(
-                torch.logsumexp(log_weight, dim=1) - np.log(num_particles))
-        elif train_mode == 'ws':
-            loss = losses.get_sleep_loss(
-                generative_model, inference_network, num_particles * len(obss))
-            log_evidence = torch.tensor(0, dtype=torch.float)
-        loss.backward()
-        q_grad_mean_std.update([param.grad for param in
-                                inference_network.parameters()])
-        p_grad_mean_std.update([param.grad for param in
-                                generative_model.parameters()])
-        log_evidence_mean_std.update([log_evidence.unsqueeze(0)])
-
-    return list(map(
-        lambda x: x.avg_of_means_stds(),
-        [p_grad_mean_std, q_grad_mean_std, log_evidence_mean_std]))
-
-
-def old():
+def run():
     num_iterations = 2000
     logging_interval = 10
     eval_interval = 10
@@ -216,58 +176,7 @@ def old():
     obss = [true_generative_model.sample_obs() for _ in range(args.batch_size)]
 
     num_mc_samples = 100
-    num_particles_list = [2, 5, 10, 20, 50]
-    train_mode_list = ['reinforce', 'ws', 'vimco', 'ww']
-
-    p_grad_stats = np.zeros((len(num_particles_list), len(train_mode_list), 2))
-    q_grad_stats = np.zeros((len(num_particles_list), len(train_mode_list), 2))
-    log_evidence_stats = np.zeros(
-        (len(num_particles_list), len(train_mode_list), 2))
-
-    for num_particles_idx, num_particles in enumerate(num_particles_list):
-        for train_mode_idx, train_mode in enumerate(train_mode_list):
-            util.print_with_time('num_particles = {}, train_mode = {}'.format(
-                num_particles, train_mode))
-            (p_grad_stats[num_particles_idx, train_mode_idx],
-             q_grad_stats[num_particles_idx, train_mode_idx],
-             log_evidence_stats[num_particles_idx, train_mode_idx]) = \
-                get_mean_stds(generative_model, inference_network,
-                              num_mc_samples, obss, num_particles, train_mode)
-
-    util.save_object([p_grad_stats, q_grad_stats, log_evidence_stats],
-                     util.get_variance_analysis_filename())
-
-
-def new_():
-    num_iterations = 2000
-    logging_interval = 10
-    eval_interval = 10
-    checkpoint_interval = 100
-    batch_size = 2
-    pcfg_path = './pcfgs/astronomers_pcfg.json'
-    seed = 1
-    train_mode = 'vimco'
-    num_particles = 50
-    exp_levenshtein = True
-
-    model_folder = util.get_most_recent_model_folder_args_match(
-        num_iterations=num_iterations,
-        logging_interval=logging_interval,
-        eval_interval=eval_interval,
-        checkpoint_interval=checkpoint_interval,
-        batch_size=batch_size,
-        seed=seed,
-        train_mode=train_mode,
-        num_particles=num_particles,
-        exp_levenshtein=exp_levenshtein)
-    stats = util.load_object(util.get_stats_filename(model_folder))
-    args = util.load_object(util.get_args_filename(model_folder))
-    generative_model, inference_network = util.load_models(model_folder)
-    _, _, true_generative_model = util.init_models(args.pcfg_path)
-    obss = [true_generative_model.sample_obs() for _ in range(args.batch_size)]
-
-    num_mc_samples = 2 # 100
-    num_particles_list = [2, 3, 4]  ## [2, 5, 10, 20, 50]
+    num_particles_list = [2, 5, 10, 20, 50, 100]
 
     vimco_grad = np.zeros((len(num_particles_list), 2))
     vimco_one_grad = np.zeros((len(num_particles_list), 2))
@@ -285,7 +194,7 @@ def new_():
         (vimco_grad[i], vimco_one_grad[i], reinforce_grad[i],
          reinforce_one_grad[i], two_grad[i], log_evidence_stats[i],
          log_evidence_grad[i], wake_phi_loss_grad[i], log_Q_grad[i],
-         sleep_loss_grad[i]) = get_mean_stds_new(
+         sleep_loss_grad[i]) = get_mean_stds(
             generative_model, inference_network, num_mc_samples, obss,
             num_particles)
 
@@ -320,7 +229,7 @@ def plot():
 
     for ax in axss[1]:
         ax.set_yscale('log')
-    #     ax.set_yticks([0, ax.get_yticks()[-1]])
+        # ax.set_yticks([0, ax.get_yticks()[-1]])
         # ax.set_yticks([ax.get_yticks()[0], ax.get_yticks()[-1]])
         # ax.set_yticks([1e-2, 1e4])
         ax.set_xlabel('K')
@@ -348,8 +257,7 @@ def plot():
 
 
 def main():
-    # old()
-    new_()
+    run()
     # plot()
 
 
