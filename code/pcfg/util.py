@@ -366,6 +366,10 @@ def get_stats_filename(model_folder='.'):
     return os.path.join(model_folder, 'stats.pkl')
 
 
+def get_variance_analysis_filename():
+    return './variance_analysis/data.pkl'
+
+
 def get_uuid():
     return str(uuid.uuid4())[:8]
 
@@ -457,6 +461,30 @@ def get_posterior(generative_model, inference_network, obs, num_particles=100):
                     inference_network.get_tree_log_prob(
                         tree, obs=obs)).detach()
                    for tree in trees]
+    tree_log_weight_dict = dict()
+    for tree, log_weight in zip(trees, log_weights):
+        string_tree = tree_to_string(tree)
+        if string_tree in tree_log_weight_dict:
+            tree_log_weight_dict[string_tree] = torch.logsumexp(
+                torch.cat([tree_log_weight_dict[string_tree].unsqueeze(0),
+                           log_weight.unsqueeze(0)]), dim=0)
+        else:
+            tree_log_weight_dict[string_tree] = log_weight
+    return sorted(list(tree_log_weight_dict.items()),
+                  key=lambda x: x[1], reverse=True)
+
+
+def get_inference_network_distribution(inference_network, obs,
+                                       num_particles=1000):
+    """Returns a sequence of (tree, log_weight) tuples sorted by weight in a
+    descending order. tree is a string representation.
+    """
+    trees = [inference_network.sample_tree(obs=obs)
+             for _ in range(num_particles)]
+    log_weights = [-torch.log(torch.tensor(num_particles, dtype=torch.float))
+                   for _ in trees]
+
+    # refactor (this is just copying the code snippet from get_posterior)
     tree_log_weight_dict = dict()
     for tree, log_weight in zip(trees, log_weights):
         string_tree = tree_to_string(tree)
@@ -580,3 +608,10 @@ def xsys2gray(xs, ys):
 
     return torch.tensor(rgba2gray(fig2rgba(fig)) / 255.0,
                         dtype=torch.float)
+
+
+def get_most_recent_model_folder_args_match(**kwargs):
+    model_folders = list_model_folders_args_match(**kwargs)
+    if len(model_folders) > 0:
+        return model_folders[np.argmax(
+            [os.stat(x).st_mtime for x in model_folders])]
