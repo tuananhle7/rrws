@@ -206,18 +206,18 @@ def run():
 
 
 def plot():
-    num_particles_list = [2, 5, 10, 20, 50]
+    num_particles_list = [2, 5, 10, 20, 50, 100]
     [vimco_grad, vimco_one_grad, reinforce_grad, reinforce_one_grad,
      two_grad, log_evidence_stats, log_evidence_grad, wake_phi_loss_grad,
      log_Q_grad, sleep_loss_grad] = util.load_object(
         './variance_analysis/data_new.pkl')
 
-    fig, axss = plt.subplots(2, 9, figsize=(18, 4), dpi=100, sharex=True,
+    fig, axss = plt.subplots(2, 10, figsize=(20, 4), dpi=100, sharex=True,
                              sharey='row')
     for i, stats in enumerate(
         [vimco_grad, vimco_one_grad, reinforce_grad, reinforce_one_grad,
          two_grad, log_evidence_grad, wake_phi_loss_grad, log_Q_grad,
-         sleep_loss_grad]):
+         sleep_loss_grad, log_evidence_stats]):
         for j in range(2):
             axss[j, i].plot(stats[:, j], color='black')
 
@@ -244,7 +244,7 @@ def plot():
         r'$g_{VIMCO}$', r'$g_{VIMCO}^1$', r'$g_{REINFORCE}$',
         r'$g_{REINFORCE}^1$', r'$g^2$', r'$\nabla_{\theta} \log Z_K$',
         r'$\nabla_{\phi}$ wake-$\phi$ loss', r'$\nabla_{\phi} \log Q$',
-        r'$\nabla_{\phi}$ sleep loss'
+        r'$\nabla_{\phi}$ sleep loss', r'$\log \hat Z_K$'
     ]):
         ax.set_title(title)
 
@@ -257,8 +257,8 @@ def plot():
 
 
 def main():
-    run()
-    # plot()
+    # run()
+    plot()
 
 
 if __name__ == '__main__':
