@@ -11,7 +11,7 @@ def main():
         for num_particles in num_particles_list:
             for seed in seeds:
                 subprocess.call(
-                    'qsub -F \"{} {} {}\" run.sh'.format(
+                    'sbatch run.sh {} {} {}'.format(
                         train_mode, num_particles, seed), shell=True)
 
 
