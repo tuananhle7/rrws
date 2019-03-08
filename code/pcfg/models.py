@@ -97,9 +97,9 @@ class GenerativeModel(nn.Module):
                                           self.grammar['terminals']),
             dtype=torch.float)
         # if levenshtein_distance.item() == 0:
-            # return levenshtein_distance
+        #     return levenshtein_distance
         # else:
-            # return torch.tensor(float('-inf'))
+        #     return torch.tensor(float('-inf'))
         # return -(torch.exp(levenshtein_distance) - 1)
         # return -levenshtein_distance
         return -levenshtein_distance**2

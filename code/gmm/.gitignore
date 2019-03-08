@@ -1,3 +1,3 @@
-*.npy
-*.pdf
-*.mp4
+models/
+Untitled.ipynb
+cp_from_arc.sh
