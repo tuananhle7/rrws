@@ -4,6 +4,7 @@ import seaborn as sns
 import numpy as np
 import os
 import matplotlib.lines as mlines
+import torch
 
 
 num_iterations = 2000
@@ -338,11 +339,52 @@ def plot_production_probs():
     print('saved to {}'.format(filename))
 
 
+def write_posteriors():
+    seed = 1
+    num_particles = 20
+    num_samples = 1000
+    num_samples_to_show = 5
+    sentence = ['astronomers', 'saw', 'stars', 'with', 'telescopes']
+
+    to_write = ''
+    for train_mode in ['ws', 'vimco']:
+        to_write += '{}\n'.format(train_mode)
+        model_folder = util.get_most_recent_model_folder_args_match(
+            num_iterations=num_iterations,
+            logging_interval=logging_interval,
+            eval_interval=eval_interval,
+            checkpoint_interval=checkpoint_interval,
+            batch_size=batch_size,
+            seed=seed,
+            train_mode=train_mode,
+            num_particles=num_particles,
+            exp_levenshtein=exp_levenshtein)
+        _, inference_network = util.load_models(model_folder)
+        q_dist = util.get_inference_network_distribution(
+            inference_network, sentence, num_samples=num_samples)
+        trees = [x[0] for x in q_dist]
+        log_weights = torch.cat([x[1].unsqueeze(0) for x in q_dist])
+        probs = [x.item() for x in
+                 util.exponentiate_and_normalize(log_weights)]
+        for i, (tree, prob) in enumerate(zip(trees, probs)):
+            if i < num_samples_to_show:
+                nltk_tree = util.tree_to_nltk_tree(tree)
+                to_write += '{},{}\n'.format(
+                    prob, nltk_tree.pformat_latex_qtree())
+    if not os.path.exists('./plots/'):
+        os.makedirs('./plots/')
+    filename = './plots/posteriors.txt'
+    with open(filename, 'w') as f:
+        f.write(to_write)
+    print('saved to {}'.format(filename))
+
+
 def main():
     # plot_errors()
     # plot_errors_end_points()
     # plot_both()
-    plot_production_probs()
+    # plot_production_probs()
+    write_posteriors()
 
 
 if __name__ == '__main__':

@@ -473,13 +473,13 @@ def get_posterior(generative_model, inference_network, obs, num_particles=100):
 
 
 def get_inference_network_distribution(inference_network, obs,
-                                       num_particles=1000):
+                                       num_samples=1000):
     """Returns a sequence of (tree, log_weight) tuples sorted by weight in a
     descending order. tree is a string representation.
     """
     trees = [inference_network.sample_tree(obs=obs)
-             for _ in range(num_particles)]
-    log_weights = [-torch.log(torch.tensor(num_particles, dtype=torch.float))
+             for _ in range(num_samples)]
+    log_weights = [-torch.log(torch.tensor(num_samples, dtype=torch.float))
                    for _ in trees]
 
     # refactor (this is just copying the code snippet from get_posterior)
