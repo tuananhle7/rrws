@@ -5,34 +5,46 @@ import numpy as np
 import os
 import matplotlib.lines as mlines
 
-# num_iterations = 5000
-# logging_interval = 10
-# eval_interval = 10
-# checkpoint_interval = 100
-# batch_size = 10
-# seed_list = [1, 2, 3, 4, 5]
-# train_mode_list = ['reinforce', 'ws', 'vimco', 'ww']
-# num_particles_list = [5, 10, 20, 50, 100]
 
 num_iterations = 2000
 logging_interval = 10
 eval_interval = 10
 checkpoint_interval = 100
 batch_size = 2
-seed_list = [1, 2, 3, 4, 5, 6]
+seed_list = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
 train_mode_list = ['reinforce', 'ws', 'vimco', 'ww']
-num_particles_list = [2, 5, 10, 20, 50]
+num_particles_list = [2, 5, 10, 20]
+exp_levenshtein = True
+pcfg_path = './pcfgs/astronomers_pcfg.json'
+
+
+def delete_rows_with_nan(data):
+    result = []
+    for row in data:
+        if not np.isnan(row).any():
+            result.append(row)
+    return np.array(result)
 
 
 def plot_with_error_bars(ax, data, **plot_kwargs):
+    data = delete_rows_with_nan(data)
+    print(len(data))
+
     mid = np.nanmedian(data, axis=0)
-    low = np.nanpercentile(data, 10, axis=0)
-    high = np.nanpercentile(data, 90, axis=0)
+    low = np.nanpercentile(data, 25, axis=0)
+    high = np.nanpercentile(data, 75, axis=0)
+
+    # mid = np.nanmean(data, axis=0)
+    # std = np.nanstd(data, axis=0)
+    # low = mid - std
+    # high = mid + std
     num_not_nan = np.count_nonzero(~np.isnan(mid))
-    ax.plot(np.arange(num_not_nan), mid[:num_not_nan], **plot_kwargs)
-    ax.fill_between(np.arange(num_not_nan),
-                    low[:num_not_nan], high[:num_not_nan],
-                    alpha=0.5, **plot_kwargs)
+
+    if num_not_nan > 0:
+        ax.plot(np.arange(num_not_nan), mid[:num_not_nan], **plot_kwargs)
+        ax.fill_between(np.arange(num_not_nan),
+                        low[:num_not_nan], high[:num_not_nan],
+                        alpha=0.5, **plot_kwargs)
 
 
 def load_errors():
@@ -59,7 +71,8 @@ def load_errors():
                     batch_size=batch_size,
                     seed=seed,
                     train_mode=train_mode,
-                    num_particles=num_particles)
+                    num_particles=num_particles,
+                    exp_levenshtein=exp_levenshtein)
                 if len(model_folders) > 0:
                     model_folder = model_folders[np.argmax(
                         [os.stat(x).st_mtime for x in model_folders])]
@@ -82,39 +95,42 @@ def load_errors():
 
 def plot_errors():
     p_error, q_error_model, q_error_true = load_errors()
-    fig, axss = plt.subplots(nrows=3, ncols=len(num_particles_list),
-                             figsize=(12, 6), sharex=True, sharey='row')
+    fig, axss = plt.subplots(nrows=2, ncols=len(num_particles_list),
+                             figsize=(12, 4), sharex=True, sharey='row')
 
     colors = ['#a6cee3', '#1f78b4', '#b2df8a', '#33a02c']
     for train_mode_idx, train_mode in enumerate(train_mode_list):
         for num_particles_idx, num_particles in enumerate(num_particles_list):
+            print('{} {}'.format(train_mode, num_particles))
             color = colors[train_mode_idx]
             plot_with_error_bars(
                 axss[0, num_particles_idx],
                 p_error[:, train_mode_idx, num_particles_idx, :], color=color)
+            # plot_with_error_bars(
+            #     axss[1, num_particles_idx],
+            #     q_error_model[:, train_mode_idx, num_particles_idx, :],
+            #     color=color)
             plot_with_error_bars(
-                axss[1, num_particles_idx],
-                q_error_model[:, train_mode_idx, num_particles_idx, :],
-                color=color)
-            plot_with_error_bars(
-                axss[2, num_particles_idx],
+                axss[-1, num_particles_idx],
                 q_error_true[:, train_mode_idx, num_particles_idx, :],
                 color=color)
 
     handles = []
     for train_mode_idx, train_mode in enumerate(train_mode_list):
         handles.append(mlines.Line2D([0], [1], color=colors[train_mode_idx]))
-    axss[-1, 2].legend(handles, train_mode_list, bbox_to_anchor=(0.5, -0.2),
-                       loc='upper center', ncol=len(train_mode_list))
+    axss[-1, 1].legend(
+        handles, list(map(lambda x: x.upper(), train_mode_list)),
+        bbox_to_anchor=(1.05, -0.2), loc='upper center',
+        ncol=len(train_mode_list))
 
     axss[0, 0].set_ylabel(r'$p_{\theta}$ error', labelpad=-17)
-    axss[1, 0].set_ylabel(r'$q_\phi$ error to $p_{\theta}$', labelpad=-5)
-    axss[2, 0].set_ylabel(r'$q_\phi$ error to $p_{true}$', labelpad=-15)
+    # axss[1, 0].set_ylabel(r'$q_\phi$ error to $p_{\theta}$', labelpad=-5)
+    axss[-1, 0].set_ylabel(r'$q_\phi$ error to $p_{true}$', labelpad=-15)
 
     for ax in axss[0]:
         ax.set_ylim(0, 0.3)
-    for ax in axss[1]:
-        ax.set_ylim(0, 20)
+    # for ax in axss[1]:
+    #     ax.set_ylim(0, 20)
     for ax in axss[-1]:
         ax.set_ylim(0, 40)
 
@@ -126,7 +142,7 @@ def plot_errors():
             sns.despine(ax=ax, trim=True)
 
     for ax in axss[-1]:
-        ax.set_xlabel('iteration', labelpad=-10)
+        ax.set_xlabel('Iteration', labelpad=-10)
 
     for ax, num_particles in zip(axss[0], num_particles_list):
         ax.set_title(r'$K = {}$'.format(num_particles))
@@ -139,8 +155,194 @@ def plot_errors():
     print('saved to {}'.format(filename))
 
 
+def plot_error_bar(ax, data, x, **kwargs):
+    data = delete_rows_with_nan(data)
+
+    mid = np.nanmedian(data, axis=0)
+    low = np.nanpercentile(data, 25, axis=0)
+    high = np.nanpercentile(data, 75, axis=0)
+
+    num_not_nan = np.count_nonzero(~np.isnan(mid))
+
+    if num_not_nan > 0:
+        ax.errorbar([x], [mid[-1]],
+                    yerr=[[mid[-1] - low[-1]], [high[-1] - mid[-1]]],
+                    marker='.', markersize=5, **kwargs)
+
+
+def plot_errors_end_points():
+    p_error, q_error_model, q_error_true = load_errors()
+    fig, axs = plt.subplots(nrows=1, ncols=2, figsize=(6, 2.5))
+    colors = ['#a6cee3', '#1f78b4', '#b2df8a', '#33a02c']
+    for train_mode_idx, train_mode in enumerate(train_mode_list):
+        for num_particles_idx, num_particles in enumerate(num_particles_list):
+            color = colors[train_mode_idx]
+            plot_error_bar(
+                axs[0], p_error[:, train_mode_idx, num_particles_idx, :],
+                num_particles_idx - 0.15 + 0.1 * train_mode_idx, color=color)
+            # plot_error_bar(
+            #     axs[1],
+            #     q_error_model[:, train_mode_idx, num_particles_idx, :],
+            #     num_particles_idx - 0.15 + 0.1 * train_mode_idx, color=color)
+            plot_error_bar(
+                axs[-1],
+                q_error_true[:, train_mode_idx, num_particles_idx, :],
+                num_particles_idx - 0.15 + 0.1 * train_mode_idx, color=color)
+
+    axs[0].set_ylabel(r'$p_{\theta}$ error', labelpad=-15)
+    # axs[1].set_ylabel(r'$q_\phi$ error to $p_{\theta}$', labelpad=0)
+    axs[-1].set_ylabel(r'$q_\phi$ error to $p_{true}$', labelpad=-15)
+
+    axs[0].set_ylim(0, 0.3)
+    # axs[1].set_ylim(0, 30)
+    axs[-1].set_ylim(0, 40)
+
+    handles = []
+    for train_mode_idx, train_mode in enumerate(train_mode_list):
+        handles.append(mlines.Line2D([0], [1], color=colors[train_mode_idx]))
+    axs[0].legend(handles, list(map(lambda x: x.upper(), train_mode_list)),
+                  bbox_to_anchor=(1.07, -0.12), loc='upper center',
+                  ncol=len(train_mode_list))
+
+    axs[0].set_xlabel('K', labelpad=-8)
+    axs[-1].set_xlabel('K', labelpad=-8)
+
+    for ax in axs:
+        ax.set_xticks(range(len(num_particles_list)))
+        ax.set_xticklabels(num_particles_list)
+        ax.set_yticks([0, ax.get_yticks()[-1]])
+        sns.despine(ax=ax, trim=True)
+
+    fig.tight_layout()
+    if not os.path.exists('./plots/'):
+        os.makedirs('./plots/')
+    filename = './plots/errors_end_points.pdf'
+    fig.savefig(filename, bbox_inches='tight')
+    print('saved to {}'.format(filename))
+
+
+def plot_both():
+    p_error, q_error_model, q_error_true = load_errors()
+    fig, axss = plt.subplots(nrows=2, ncols=len(num_particles_list) + 1,
+                             figsize=(12, 4), sharex='col', sharey='row')
+
+    colors = ['#a6cee3', '#1f78b4', '#b2df8a', '#33a02c']
+    for train_mode_idx, train_mode in enumerate(train_mode_list):
+        for num_particles_idx, num_particles in enumerate(num_particles_list):
+            print('{} {}'.format(train_mode, num_particles))
+            color = colors[train_mode_idx]
+            plot_with_error_bars(
+                axss[0, num_particles_idx],
+                p_error[:, train_mode_idx, num_particles_idx, :], color=color)
+            plot_with_error_bars(
+                axss[-1, num_particles_idx],
+                q_error_true[:, train_mode_idx, num_particles_idx, :],
+                color=color)
+            plot_error_bar(
+                axss[0, -1], p_error[:, train_mode_idx, num_particles_idx, :],
+                num_particles_idx - 0.15 + 0.1 * train_mode_idx, color=color)
+            plot_error_bar(
+                axss[-1, -1],
+                q_error_true[:, train_mode_idx, num_particles_idx, :],
+                num_particles_idx - 0.15 + 0.1 * train_mode_idx, color=color)
+
+    handles = []
+    for train_mode_idx, train_mode in enumerate(train_mode_list):
+        handles.append(mlines.Line2D([0], [1], color=colors[train_mode_idx]))
+    axss[-1, 2].legend(
+        handles, list(map(lambda x: x.upper(), train_mode_list)),
+        bbox_to_anchor=(0.5, -0.2), loc='upper center',
+        ncol=len(train_mode_list))
+
+    axss[0, 0].set_ylabel(r'$p_{\theta}$ error', labelpad=-17)
+    axss[-1, 0].set_ylabel(r'$q_\phi$ error to $p_{true}$', labelpad=-15)
+
+    for ax in axss[0]:
+        ax.set_ylim(0, 0.3)
+    for ax in axss[-1]:
+        ax.set_ylim(0, 40)
+
+    for axs in axss:
+        for ax in axs[:-1]:
+            ax.set_xticks([0, num_iterations / eval_interval - 1])
+            ax.set_xticklabels([1, num_iterations])
+            ax.set_yticks([0, ax.get_yticks()[-1]])
+            sns.despine(ax=ax, trim=True)
+
+    for ax in axss[-1, :-1]:
+        ax.set_xlabel('Iteration', labelpad=-10)
+
+    for ax, num_particles in zip(axss[0], num_particles_list):
+        ax.set_title(r'$K = {}$'.format(num_particles))
+
+    for ax in axss[:, -1]:
+        ax.set_xticks(range(len(num_particles_list)))
+        ax.set_xticklabels(num_particles_list)
+        ax.set_yticks([0, ax.get_yticks()[-1]])
+        sns.despine(ax=ax, trim=True)
+    axss[-1, -1].set_xlabel('K', labelpad=-10)
+    axss[0, -1].set_title('Last iteration')
+
+    fig.tight_layout()
+    if not os.path.exists('./plots/'):
+        os.makedirs('./plots/')
+    filename = './plots/both_errors.pdf'
+    fig.savefig(filename, bbox_inches='tight')
+    print('saved to {}'.format(filename))
+
+
+def plot_production_probs():
+    seed = 1
+    num_particles = 20
+    _, _, true_generative_model = util.init_models(
+        './pcfgs/astronomers_pcfg.json')
+    true_production_probs = util.get_production_probs(true_generative_model)
+
+    width = 0.2
+    fig, ax = plt.subplots(1, 1, figsize=(6, 3), dpi=100)
+    ax.bar(np.arange(6) - width, true_production_probs['NP'].numpy(),
+           width=width, color='black', label='True')
+    for i, (train_mode, color) in enumerate(zip(['ws', 'vimco'],
+                                                ['#1f78b4', '#b2df8a'])):
+        model_folder = util.get_most_recent_model_folder_args_match(
+            num_iterations=num_iterations,
+            logging_interval=logging_interval,
+            eval_interval=eval_interval,
+            checkpoint_interval=checkpoint_interval,
+            batch_size=batch_size,
+            seed=seed,
+            train_mode=train_mode,
+            num_particles=num_particles,
+            exp_levenshtein=exp_levenshtein)
+        generative_model, _ = util.load_models(model_folder)
+        production_probs = util.get_production_probs(generative_model)
+        ax.bar(np.arange(6) + i * width, production_probs['NP'].numpy(),
+               width=width, color=color, label=train_mode.upper())
+
+    ax.set_ylim(0, 0.5)
+    ax.set_ylabel(r'$P(NP \to \cdot)$')
+    ax.set_yticks([0, 0.5])
+    ax.set_xticks(np.arange(6))
+    ax.set_xticklabels(
+        list(map(lambda x: ' '.join(x),
+                 true_generative_model.grammar['productions']['NP'])))
+    ax.tick_params(axis='x', length=0)
+    sns.despine(ax=ax)
+    ax.legend()
+
+    fig.tight_layout()
+    if not os.path.exists('./plots/'):
+        os.makedirs('./plots/')
+    filename = './plots/np_probs.pdf'
+    fig.savefig(filename, bbox_inches='tight')
+    print('saved to {}'.format(filename))
+
+
 def main():
-    plot_errors()
+    # plot_errors()
+    # plot_errors_end_points()
+    # plot_both()
+    plot_production_probs()
 
 
 if __name__ == '__main__':
