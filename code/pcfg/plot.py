@@ -13,7 +13,7 @@ eval_interval = 10
 checkpoint_interval = 100
 batch_size = 2
 seed_list = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
-train_mode_list = ['reinforce', 'ws', 'vimco', 'ww']
+train_mode_list = ['reinforce', 'vimco', 'ws', 'ww']
 num_particles_list = [2, 5, 10, 20]
 exp_levenshtein = True
 pcfg_path = './pcfgs/astronomers_pcfg.json'
@@ -45,7 +45,7 @@ def plot_with_error_bars(ax, data, **plot_kwargs):
         ax.plot(np.arange(num_not_nan), mid[:num_not_nan], **plot_kwargs)
         ax.fill_between(np.arange(num_not_nan),
                         low[:num_not_nan], high[:num_not_nan],
-                        alpha=0.5, **plot_kwargs)
+                        alpha=0.2, **plot_kwargs)
 
 
 def load_errors():
@@ -99,14 +99,18 @@ def plot_errors():
     fig, axss = plt.subplots(nrows=2, ncols=len(num_particles_list),
                              figsize=(12, 4), sharex=True, sharey='row')
 
-    colors = ['#a6cee3', '#1f78b4', '#b2df8a', '#33a02c']
+    # colors = ['#a6cee3', '#1f78b4', '#b2df8a', '#33a02c']
+    colors = ['C4', 'C5', 'C1', 'C6']
+    linestyles = ['dashed', 'dashed', 'solid', 'solid']
     for train_mode_idx, train_mode in enumerate(train_mode_list):
         for num_particles_idx, num_particles in enumerate(num_particles_list):
             print('{} {}'.format(train_mode, num_particles))
             color = colors[train_mode_idx]
+            linestyle = linestyles[train_mode_idx]
             plot_with_error_bars(
                 axss[0, num_particles_idx],
-                p_error[:, train_mode_idx, num_particles_idx, :], color=color)
+                p_error[:, train_mode_idx, num_particles_idx, :], color=color,
+                linestyle=linestyle)
             # plot_with_error_bars(
             #     axss[1, num_particles_idx],
             #     q_error_model[:, train_mode_idx, num_particles_idx, :],
@@ -114,11 +118,12 @@ def plot_errors():
             plot_with_error_bars(
                 axss[-1, num_particles_idx],
                 q_error_true[:, train_mode_idx, num_particles_idx, :],
-                color=color)
+                color=color, linestyle=linestyle)
 
     handles = []
     for train_mode_idx, train_mode in enumerate(train_mode_list):
-        handles.append(mlines.Line2D([0], [1], color=colors[train_mode_idx]))
+        handles.append(mlines.Line2D([0], [1], color=colors[train_mode_idx],
+                                     linestyle=linestyles[train_mode_idx]))
     axss[-1, 1].legend(
         handles, list(map(lambda x: x.upper(), train_mode_list)),
         bbox_to_anchor=(1.05, -0.2), loc='upper center',
@@ -174,7 +179,8 @@ def plot_error_bar(ax, data, x, **kwargs):
 def plot_errors_end_points():
     p_error, q_error_model, q_error_true = load_errors()
     fig, axs = plt.subplots(nrows=1, ncols=2, figsize=(6, 2.5))
-    colors = ['#a6cee3', '#1f78b4', '#b2df8a', '#33a02c']
+    # colors = ['#a6cee3', '#1f78b4', '#b2df8a', '#33a02c']
+    colors = ['C4', 'C5', 'C1', 'C6']
     for train_mode_idx, train_mode in enumerate(train_mode_list):
         for num_particles_idx, num_particles in enumerate(num_particles_list):
             color = colors[train_mode_idx]
@@ -227,7 +233,8 @@ def plot_both():
     fig, axss = plt.subplots(nrows=2, ncols=len(num_particles_list) + 1,
                              figsize=(12, 4), sharex='col', sharey='row')
 
-    colors = ['#a6cee3', '#1f78b4', '#b2df8a', '#33a02c']
+    # colors = ['#a6cee3', '#1f78b4', '#b2df8a', '#33a02c']
+    colors = ['C4', 'C5', 'C1', 'C6']
     for train_mode_idx, train_mode in enumerate(train_mode_list):
         for num_particles_idx, num_particles in enumerate(num_particles_list):
             print('{} {}'.format(train_mode, num_particles))
@@ -380,11 +387,11 @@ def write_posteriors():
 
 
 def main():
-    # plot_errors()
+    plot_errors()
     # plot_errors_end_points()
     # plot_both()
     # plot_production_probs()
-    write_posteriors()
+    # write_posteriors()
 
 
 if __name__ == '__main__':
