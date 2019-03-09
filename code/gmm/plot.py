@@ -29,6 +29,7 @@ plt.rc('text.latex',
        preamble=[r'\usepackage{amsmath}',
                  r'\usepackage[cm]{sfmath}'])  # for \text command
 plt.rc('font', **{'family': 'sans-serif', 'sans-serif': ['cm']})
+plt.rc('axes', titlepad=3)
 
 colors = ['C0', 'C3', 'C4', 'C5', 'C1', 'C6', 'C7']
 linestyles = ['dashed', 'dashed', 'dashed', 'dashed', 'solid', 'solid',
@@ -255,6 +256,8 @@ def plot_models():
                 ax.set_xlim(0, 20)
                 test_x_tensor = torch.tensor(test_x, dtype=torch.float,
                                              device=args.device).unsqueeze(0)
+                if iteration_idx == 0:
+                    ax.set_title(r'$q_\phi(z | x = {0:.0f})$'.format(test_x))
 
                 # true
                 plot_hinton(
