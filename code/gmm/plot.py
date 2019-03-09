@@ -31,6 +31,8 @@ plt.rc('text.latex',
 plt.rc('font', **{'family': 'sans-serif', 'sans-serif': ['cm']})
 
 colors = ['C0', 'C3', 'C4', 'C5', 'C1', 'C6', 'C7']
+linestyles = ['dashed', 'dashed', 'dashed', 'dashed', 'solid', 'solid',
+              'solid']
 labels = ['Concrete', 'RELAX', 'REINFORCE', 'VIMCO', 'WS', 'WW',
           r'$\delta$-WW']
 train_mode_list = ['concrete', 'relax', 'reinforce', 'vimco', 'ws', 'ww',
@@ -304,7 +306,7 @@ def plot_models():
 
 
 def main():
-    # plot_errors()
+    plot_errors()
     plot_models()
 
 
