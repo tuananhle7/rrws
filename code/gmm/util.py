@@ -137,20 +137,24 @@ def load_models(model_folder='.', iteration=None):
                                          'gen{}.pt'.format(suffix))
     inference_network_path = os.path.join(model_folder,
                                           'inf{}.pt'.format(suffix))
-    args = load_object(get_args_path(model_folder))
+    if os.path.exists(generative_model_path):
+        args = load_object(get_args_path(model_folder))
 
-    generative_model = models.GenerativeModel(
-        args.init_mixture_logits, softmax_multiplier=args.softmax_multiplier,
-        device=args.device).to(device=args.device)
-    inference_network = models.InferenceNetwork(
-        args.num_mixtures, args.relaxed_one_hot, args.temperature,
-        args.device).to(device=args.device)
-    generative_model.load_state_dict(torch.load(generative_model_path))
-    print_with_time('Loaded from {}'.format(generative_model_path))
-    inference_network.load_state_dict(torch.load(inference_network_path))
-    print_with_time('Loaded from {}'.format(inference_network_path))
+        generative_model = models.GenerativeModel(
+            args.init_mixture_logits,
+            softmax_multiplier=args.softmax_multiplier, device=args.device
+        ).to(device=args.device)
+        inference_network = models.InferenceNetwork(
+            args.num_mixtures, args.relaxed_one_hot, args.temperature,
+            args.device).to(device=args.device)
+        generative_model.load_state_dict(torch.load(generative_model_path))
+        print_with_time('Loaded from {}'.format(generative_model_path))
+        inference_network.load_state_dict(torch.load(inference_network_path))
+        print_with_time('Loaded from {}'.format(inference_network_path))
 
-    return generative_model, inference_network
+        return generative_model, inference_network
+    else:
+        return None, None
 
 
 def save_control_variate(control_variate, model_folder='.', iteration=None):
@@ -175,14 +179,6 @@ def load_control_variate(model_folder='.', iteration=None):
     control_variate = models.ControlVariate(args.num_mixtures)
     control_variate.load_state_dict(torch.load(path))
     print_with_time('Loaded from {}'.format(path))
-
-
-def get_stats_filename(model_folder='.'):
-    return os.path.join(model_folder, 'stats.pkl')
-
-
-def get_args_filename(model_folder='.'):
-    return os.path.join(model_folder, 'args.pkl')
 
 
 def init_models(args):
@@ -306,7 +302,7 @@ class OnlineMeanStd():
 def args_match(model_folder, **kwargs):
     """Do training args match kwargs?"""
 
-    args_filename = get_args_filename(model_folder)
+    args_filename = get_args_path(model_folder)
     if os.path.exists(args_filename):
         args = load_object(args_filename)
         for k, v in kwargs.items():
