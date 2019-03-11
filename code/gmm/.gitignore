@@ -1,4 +1,5 @@
 jobs_out_err/
+plots/
 models/
 Untitled.ipynb
 cp_from_arc.sh
