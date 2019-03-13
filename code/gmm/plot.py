@@ -226,7 +226,7 @@ def plot_models():
             i = 0
             plot_hinton(
                 ax, true_generative_model.get_latent_params().data.numpy(),
-                8 - i, 8 - i - 1, 0, 20, label='true', color='black')
+                8 - i, 8 - i - 1, 0, 20, color='black')
 
             # learned generative models
             for train_mode_idx, train_mode in enumerate(train_mode_list):
@@ -264,7 +264,7 @@ def plot_models():
                 plot_hinton(
                     ax, true_generative_model.get_posterior_probs(
                         test_x_tensor)[0].data.numpy(), 8 - i, 8 - i - 1, 0,
-                    20, label='true', color='black')
+                    20, color='black')
 
                 # learned
                 for train_mode_idx, train_mode in enumerate(train_mode_list):
@@ -291,7 +291,7 @@ def plot_models():
                 verticalalignment='bottom', horizontalalignment='center',
                 transform=ax.transAxes)
 
-    handles = [mpatches.Rectangle((0, 0), 1, 1, color='black', label='true')]
+    handles = [mpatches.Rectangle((0, 0), 1, 1, color='black', label='True')]
     for color, label in zip(colors, labels):
         handles.append(mpatches.Rectangle((0, 0), 1, 1,
                        color=color, label=label))
@@ -333,7 +333,7 @@ def plot_model_movie():
         axss[num_particles_idx, 0].set_ylabel(
             '$K = {}$'.format(num_particles), fontsize=SMALL_SIZE)
 
-    handles = [mpatches.Rectangle((0, 0), 1, 1, color='black', label='true')]
+    handles = [mpatches.Rectangle((0, 0), 1, 1, color='black', label='True')]
     for color, label in zip(colors, labels):
         handles.append(mpatches.Rectangle((0, 0), 1, 1,
                        color=color, label=label))
@@ -381,7 +381,7 @@ def plot_model_movie():
             i = 0
             plot_hinton(
                 ax, true_generative_model.get_latent_params().data.numpy(),
-                8 - i, 8 - i - 1, 0, 20, label='true', color='black')
+                8 - i, 8 - i - 1, 0, 20, color='black')
 
             # learned generative models
             for train_mode_idx, train_mode in enumerate(train_mode_list):
@@ -412,7 +412,7 @@ def plot_model_movie():
                 plot_hinton(
                     ax, true_generative_model.get_posterior_probs(
                         test_x_tensor)[0].data.numpy(), 8 - i, 8 - i - 1, 0,
-                    20, label='true', color='black')
+                    20, color='black')
 
                 # learned
                 for train_mode_idx, train_mode in enumerate(train_mode_list):
