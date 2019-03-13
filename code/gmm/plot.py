@@ -5,6 +5,7 @@ import os
 import matplotlib.lines as mlines
 import torch
 import matplotlib.patches as mpatches
+from matplotlib.animation import FuncAnimation
 
 SMALL_SIZE = 5.5
 MEDIUM_SIZE = 9
@@ -308,9 +309,143 @@ def plot_models():
     print('Saved to {}'.format(filename))
 
 
+def plot_model_movie():
+    num_test_x = 5
+    num_particles_list = [2, 5, 10, 20]
+    seed = seed_list[0]
+    model_folder = util.get_most_recent_model_folder_args_match(
+        seed=seed_list[0],
+        train_mode=train_mode_list[0],
+        num_particles=num_particles_list[0])
+    args = util.load_object(util.get_args_path(model_folder))
+    _, _, true_generative_model = util.init_models(args)
+    test_xs = np.linspace(0, 19, num=num_test_x) * 10
+
+    nrows = len(num_particles_list)
+    ncols = num_test_x + 1
+    width = 5.5
+    ax_width = width / ncols
+    height = nrows * ax_width
+    fig, axss = plt.subplots(nrows, ncols, sharex=True, sharey=True, dpi=300)
+    fig.set_size_inches(width, height)
+
+    for num_particles_idx, num_particles in enumerate(num_particles_list):
+        axss[num_particles_idx, 0].set_ylabel(
+            '$K = {}$'.format(num_particles), fontsize=SMALL_SIZE)
+
+    handles = [mpatches.Rectangle((0, 0), 1, 1, color='black', label='true')]
+    for color, label in zip(colors, labels):
+        handles.append(mpatches.Rectangle((0, 0), 1, 1,
+                       color=color, label=label))
+    axss[-1, ncols // 2].legend(bbox_to_anchor=(0, -0.05), loc='upper center',
+                                ncol=len(handles), handles=handles)
+
+    axss[0, 0].set_title(r'$p_\theta(z)$')
+    for test_x_idx, test_x in enumerate(test_xs):
+        axss[0, 1 + test_x_idx].set_title(r'$q_\phi(z | x = {0:.0f})$'.format(
+            test_x))
+    for ax in axss[-1]:
+        ax.set_xlabel(r'$z$', labelpad=0.5)
+
+    for axs in axss:
+        for ax in axs:
+            ax.set_xticks([])
+            ax.set_xticklabels([])
+            ax.set_yticks([])
+            ax.set_yticklabels([])
+            ax.set_ylim(0, 8)
+            ax.set_xlim(0, 20)
+    # title = fig.suptitle('Iteration 0')
+    t = axss[0, ncols // 2].text(
+        0, 1.23, 'Iteration 0',
+        horizontalalignment='center', verticalalignment='center',
+        transform=axss[0, ncols // 2].transAxes, fontsize=MEDIUM_SIZE)
+
+    fig.tight_layout(pad=0, rect=[0.01, 0.04, 0.99, 0.96])
+
+    def update(frame):
+        result = []
+        iteration_idx = frame
+        iteration = iteration_idx * 1000
+        t.set_text('Iteration {}'.format(iteration))
+        result.append(t)
+
+        for axs in axss:
+            for ax in axs:
+                result.append(ax.add_artist(
+                    mpatches.Rectangle((0, 0), 20, 8, color='white')))
+        for num_particles_idx, num_particles in enumerate(num_particles_list):
+            ax = axss[num_particles_idx, 0]
+
+            # true generative model
+            i = 0
+            plot_hinton(
+                ax, true_generative_model.get_latent_params().data.numpy(),
+                8 - i, 8 - i - 1, 0, 20, label='true', color='black')
+
+            # learned generative models
+            for train_mode_idx, train_mode in enumerate(train_mode_list):
+                label = labels[train_mode_idx]
+                color = colors[train_mode_idx]
+                model_folder = util.get_most_recent_model_folder_args_match(
+                    seed=seed, train_mode=train_mode,
+                    num_particles=num_particles)
+                if model_folder is not None:
+                    generative_model, _ = util.load_models(
+                        model_folder, iteration=iteration)
+                    if generative_model is not None:
+                        plot_hinton(
+                            ax,
+                            generative_model.get_latent_params().data.numpy(),
+                            8 - train_mode_idx - 1, 8 - train_mode_idx - 2, 0,
+                            20, label=label, color=color)
+
+            result += ax.artists
+
+            # inference network
+            for test_x_idx, test_x in enumerate(test_xs):
+                ax = axss[num_particles_idx, test_x_idx + 1]
+                test_x_tensor = torch.tensor(test_x, dtype=torch.float,
+                                             device=args.device).unsqueeze(0)
+
+                # true
+                plot_hinton(
+                    ax, true_generative_model.get_posterior_probs(
+                        test_x_tensor)[0].data.numpy(), 8 - i, 8 - i - 1, 0,
+                    20, label='true', color='black')
+
+                # learned
+                for train_mode_idx, train_mode in enumerate(train_mode_list):
+                    label = labels[train_mode_idx]
+                    color = colors[train_mode_idx]
+                    model_folder = \
+                        util.get_most_recent_model_folder_args_match(
+                            seed=seed, train_mode=train_mode,
+                            num_particles=num_particles)
+                    if model_folder is not None:
+                        _, inference_network = util.load_models(
+                            model_folder, iteration=iteration)
+                        if inference_network is not None:
+                            plot_hinton(
+                                ax, inference_network.get_latent_params(
+                                    test_x_tensor)[0].data.numpy(),
+                                8 - train_mode_idx - 1, 8 - train_mode_idx - 2,
+                                0, 20, label=label, color=color)
+                result += ax.artists
+        return result
+
+    anim = FuncAnimation(fig, update, frames=np.arange(100), blit=True)
+    if not os.path.exists('./plots/'):
+        os.makedirs('./plots/')
+    filename = './plots/model_movie.mp4'
+    anim.save(filename, dpi=300)
+    print('Saved to {}'.format(filename))
+
+
 def main():
     plot_errors()
     plot_models()
+    plot_model_movie()
 
 
 if __name__ == '__main__':
