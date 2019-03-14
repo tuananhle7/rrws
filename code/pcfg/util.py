@@ -613,3 +613,42 @@ def get_most_recent_model_folder_args_match(**kwargs):
     if len(model_folders) > 0:
         return model_folders[np.argmax(
             [os.stat(x).st_mtime for x in model_folders])]
+
+
+def sample_relax(logits, epsilon=1e-6):
+    """This implements Appendix C in the REBAR paper.
+
+    Args:
+        logits: tensor of shape [num_categories]
+
+    Returns:
+        latent, latent_aux, latent_aux_tilde: tensors of shape [num_categories]
+    """
+    batch_size = len(obs)
+    num_mixtures = inference_network.num_mixtures
+    probs = inference_network.get_latent_params(obs)
+    probs_expanded = probs.unsqueeze(1).expand(
+        batch_size, num_particles, num_mixtures).contiguous().view(
+        batch_size * num_particles, num_mixtures)
+    num_categories = len(logits)
+    probs = exponentiate_and_normalize(logits)
+
+    # latent_aux
+    u = torch.distributions.Uniform(0 + epsilon, 1 - epsilon).sample(
+        sample_shape=(num_categories,))
+    latent_aux = torch.log(probs) - torch.log(-torch.log(u))
+
+    # latent
+    latent = torch.zeros(num_categories)
+    latent[torch.argmax(latent_aux, dim=1)] = 1
+    latent_byte = latent.byte()
+
+    # latent_aux_tilde
+    v = torch.distributions.Uniform(0 + epsilon, 1 - epsilon).sample(
+        sample_shape=(num_categories,))
+    latent_aux_tilde = torch.zeros(num_categories)
+    latent_aux_tilde[latent_byte] = -torch.log(-torch.log(v[latent_byte]))
+    latent_aux_tilde[1 - latent_byte] = -torch.log(
+        -torch.log(v[1 - latent_byte]) / probs[1 - latent_byte] -
+        torch.log(v[latent_byte]))
+    return latent, latent_aux, latent_aux_tilde
