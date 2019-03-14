@@ -71,7 +71,7 @@ class TrainWakeSleepCallback():
             self.elbo_history.append(elbo)
 
         if iteration % self.checkpoint_interval == 0:
-            stats_filename = util.get_stats_filename(self.model_folder)
+            stats_filename = util.get_stats_path(self.model_folder)
             util.save_object(self, stats_filename)
             util.save_models(generative_model, inference_network,
                              self.model_folder, iteration)
@@ -202,7 +202,7 @@ class TrainWakeWakeCallback():
             self.elbo_history.append(elbo)
 
         if iteration % self.checkpoint_interval == 0:
-            stats_filename = util.get_stats_filename(self.model_folder)
+            stats_filename = util.get_stats_path(self.model_folder)
             util.save_object(self, stats_filename)
             util.save_models(generative_model, inference_network,
                              self.model_folder, iteration)
@@ -261,7 +261,7 @@ class TrainDefensiveWakeWakeCallback():
             self.elbo_history.append(elbo)
 
         if iteration % self.checkpoint_interval == 0:
-            stats_filename = util.get_stats_filename(self.model_folder)
+            stats_filename = util.get_stats_path(self.model_folder)
             util.save_object(self, stats_filename)
             util.save_models(generative_model, inference_network,
                              self.model_folder, iteration)
@@ -354,7 +354,7 @@ class TrainIwaeCallback():
             self.elbo_history.append(elbo)
 
         if iteration % self.checkpoint_interval == 0:
-            stats_filename = util.get_stats_filename(self.model_folder)
+            stats_filename = util.get_stats_path(self.model_folder)
             util.save_object(self, stats_filename)
             util.save_models(generative_model, inference_network,
                              self.model_folder, iteration)
@@ -422,7 +422,7 @@ class TrainConcreteCallback():
             self.elbo_history.append(elbo)
 
         if iteration % self.checkpoint_interval == 0:
-            stats_filename = util.get_stats_filename(self.model_folder)
+            stats_filename = util.get_stats_path(self.model_folder)
             util.save_object(self, stats_filename)
             util.save_models(generative_model, inference_network,
                              self.model_folder, iteration)
@@ -520,7 +520,7 @@ class TrainRelaxCallback():
             self.elbo_history.append(elbo)
 
         if iteration % self.checkpoint_interval == 0:
-            stats_filename = util.get_stats_filename(self.model_folder)
+            stats_filename = util.get_stats_path(self.model_folder)
             util.save_object(self, stats_filename)
             util.save_models(generative_model, inference_network,
                              self.model_folder, iteration)
