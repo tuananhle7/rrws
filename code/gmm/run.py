@@ -30,7 +30,7 @@ def run(args):
 
     # save args
     model_folder = util.get_model_folder()
-    args_filename = util.get_args_filename(model_folder)
+    args_filename = util.get_args_path(model_folder)
     util.save_object(args, args_filename)
 
     # init models
