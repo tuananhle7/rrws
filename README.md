@@ -1,56 +1,11 @@
-# Reweighted Wake-Sleep for Probabilistic Programs 
-_(a.k.a. Coordinate Descent Auto-Encoder)_
+# Revisiting Reweighted Wake-Sleep
 
-## GMM Open Universe
-
-In `code/gmm-open-universe`, run
-
+Code for [this paper](https://arxiv.org/abs/1805.10469):
 ```
-python gmm_open_universe_vae.py
-python gmm_open_universe_vae_relax.py
-python gmm_open_universe_cdae.py
+@article{le2018revisiting,
+  title = {Revisiting Reweighted Wake-Sleep},
+  author = {Le, Tuan Anh and Kosiorek, Adam R. and Siddharth, N. and Teh, Yee Whye and Wood, Frank},
+  journal = {arXiv preprint 1805.10469},
+  year = {2018}
+}
 ```
-
-to train the generative and inference networks. Then run
-
-```
-python plot.py
-```
-
-to obtain plots.
-
-## MNIST/Omniglot
-
-In `code/mnist-omniglot`, run
-
-```
-python train.py --help
-```
-
-to see instructions to train the generative and inference networks. Then run
-
-```
-python plot.py
-```
-
-to obtain plots.
-
-## Hidden Markov Model
-
-Dependencies:
-- https://github.com/hmmlearn/hmmlearn
-- https://github.com/tuananhle7/aesmc/tree/master/code
-
-In `code/hmm`, run
-
-```
-python train.py --help
-```
-
-to see instructions to train the generative and inference networks. Then run
-
-```
-python plot.py
-```
-
-to obtain plots.
