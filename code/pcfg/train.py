@@ -287,3 +287,95 @@ class TrainIwaeCallback():
                     iteration, self.p_error_history[-1],
                     self.q_error_to_true_history[-1],
                     self.q_error_to_model_history[-1]))
+
+
+def train_relax(generative_model, inference_network, control_variate,
+                true_generative_model, batch_size, num_iterations,
+                num_particles, callback=None):
+    """Train using RELAX."""
+
+    num_q_params = sum([param.nelement()
+                        for param in inference_network.parameters()])
+    iwae_optimizer = torch.optim.Adam(itertools.chain(
+        generative_model.parameters(), inference_network.parameters()))
+    control_variate_optimizer = torch.optim.Adam(control_variate.parameters())
+
+    for iteration in range(num_iterations):
+        # generate synthetic data
+        obss = [true_generative_model.sample_obs() for _ in range(batch_size)]
+
+        # optimize theta and phi
+        iwae_optimizer.zero_grad()
+        control_variate_optimizer.zero_grad()
+        loss, elbo = losses.get_relax_loss(
+            generative_model, inference_network, control_variate, obss,
+            num_particles)
+        if torch.isnan(loss):
+            import pdb
+            pdb.set_trace()
+        loss.backward(create_graph=True)
+        iwae_optimizer.step()
+
+        # optimize rho
+        control_variate_optimizer.zero_grad()
+        torch.autograd.backward(
+            [2 * q_param.grad / num_q_params
+             for q_param in inference_network.parameters()],
+            [q_param.grad.detach()
+             for q_param in inference_network.parameters()]
+        )
+        control_variate_optimizer.step()
+
+        if callback is not None:
+            callback(iteration, loss.item(), elbo.item(), generative_model,
+                     inference_network, control_variate)
+
+    return iwae_optimizer, control_variate_optimizer
+
+
+class TrainRelaxCallback():
+    def __init__(self, pcfg_path, model_folder, true_generative_model,
+                 logging_interval=10, checkpoint_interval=100,
+                 eval_interval=10):
+        self.pcfg_path = pcfg_path
+        self.model_folder = model_folder
+        self.true_generative_model = true_generative_model
+        self.logging_interval = logging_interval
+        self.checkpoint_interval = checkpoint_interval
+        self.eval_interval = eval_interval
+
+        self.loss_history = []
+        self.elbo_history = []
+        self.p_error_history = []
+        self.q_error_to_true_history = []
+        self.q_error_to_model_history = []
+
+    def __call__(self, iteration, loss, elbo, generative_model,
+                 inference_network, control_variate):
+        if iteration % self.logging_interval == 0:
+            util.print_with_time(
+                'Iteration {} loss = {:.3f}, elbo = {:.3f}'.format(
+                    iteration, loss, elbo))
+            self.loss_history.append(loss)
+            self.elbo_history.append(elbo)
+
+        if iteration % self.checkpoint_interval == 0:
+            stats_filename = util.get_stats_filename(self.model_folder)
+            util.save_object(self, stats_filename)
+            util.save_models(generative_model, inference_network,
+                             self.pcfg_path, self.model_folder)
+            util.save_control_variate(control_variate, self.model_folder)
+
+        if iteration % self.eval_interval == 0:
+            self.p_error_history.append(util.get_p_error(
+                self.true_generative_model, generative_model))
+            self.q_error_to_true_history.append(util.get_q_error(
+                self.true_generative_model, inference_network))
+            self.q_error_to_model_history.append(util.get_q_error(
+                generative_model, inference_network))
+            util.print_with_time(
+                'Iteration {} p_error = {:.3f}, q_error_to_true = {:.3f}, '
+                'q_error_to_model = {:.3f}'.format(
+                    iteration, self.p_error_history[-1],
+                    self.q_error_to_true_history[-1],
+                    self.q_error_to_model_history[-1]))

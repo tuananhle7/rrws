@@ -2,10 +2,11 @@ import torch
 import torch.nn as nn
 import util
 from torch.distributions import *
+import numpy as np
 
 
 class GenerativeModel(nn.Module):
-    def __init__(self, grammar, production_probs_init=None):
+    def __init__(self, grammar, production_probs_init=None, max_depth=50):
         super(GenerativeModel, self).__init__()
         self.grammar = grammar
         if self.grammar['name'] == 'polynomial':
@@ -18,8 +19,9 @@ class GenerativeModel(nn.Module):
             self.production_logits = nn.ParameterDict({
                 k: nn.Parameter(torch.log(v))
                 for k, v in production_probs_init.items()})
+        self.max_depth = max_depth
 
-    def sample_tree(self, symbol=None, depth=0, max_depth=100):
+    def sample_tree(self, symbol=None, depth=0):
         """Sample tree from prior.
 
         Args: start symbol
@@ -31,15 +33,14 @@ class GenerativeModel(nn.Module):
 
         if symbol in self.grammar['terminals']:
             return symbol
-        elif depth > max_depth:
+        elif depth > self.max_depth:
             return symbol
         else:
             dist = Categorical(logits=self.production_logits[symbol])
             production_index = dist.sample().detach()
             production = self.grammar['productions'][symbol][production_index]
             return [symbol] + \
-                [self.sample_tree(s, depth=depth + 1, max_depth=max_depth)
-                 for s in production]
+                [self.sample_tree(s, depth=depth + 1) for s in production]
 
     def sample_tree_and_obs(self):
         """Samples a (tree, obs) tuple from prior."""
@@ -148,11 +149,12 @@ class GenerativeModel(nn.Module):
 
 class InferenceNetwork(nn.Module):
     def __init__(self, grammar, obs_embedding_dim=100,
-                 inference_hidden_dim=100):
+                 inference_hidden_dim=100, max_depth=50):
         super(InferenceNetwork, self).__init__()
         self.grammar = grammar
         self.obs_embedding_dim = obs_embedding_dim
         self.inference_hidden_dim = inference_hidden_dim
+        self.max_depth = max_depth
         self.sample_address_embedding_dim = len(grammar['non_terminals'])
         self.word_embedding_dim = len(self.grammar['terminals'])
 
@@ -258,6 +260,7 @@ class InferenceNetwork(nn.Module):
         """Args:
             obs_embedding: tensor [obs_embedding_dim]
             previous_sample_embedding: tensor [sample_embedding_dim]
+            sample_address_embedding: tensor [sample_embedding_address_dim]
             inference_hidden: tensor [inference_hidden_dim]
 
         Returns: tensor [inference_hidden_dim]
@@ -320,7 +323,7 @@ class InferenceNetwork(nn.Module):
 
     def sample_tree(self, symbol=None, obs_embedding=None,
                     previous_sample_embedding=None, inference_hidden=None,
-                    obs=None, depth=0, max_depth=100):
+                    obs=None, depth=0):
         """Samples a tree given a obs and a start symbol (can be terminal
             or non-terminal).
 
@@ -349,7 +352,7 @@ class InferenceNetwork(nn.Module):
 
         if symbol in self.grammar['terminals']:
             return symbol
-        elif depth > max_depth:
+        elif depth > self.max_depth:
             return symbol
         else:
             sample_address_embedding = util.get_sample_address_embedding(
@@ -366,6 +369,204 @@ class InferenceNetwork(nn.Module):
 
             return [symbol] + [
                 self.sample_tree(s, obs_embedding, sample_embedding,
-                                 inference_gru_output, depth=depth + 1,
-                                 max_depth=max_depth)
+                                 inference_gru_output, depth=depth + 1)
                 for s in production]
+
+    def sample_tree_relax(self, symbol=None, obs_embedding=None,
+                          previous_sample_embedding=None,
+                          inference_hidden=None, obs=None, depth=0):
+        """Samples a tree given a obs and a start symbol (can be terminal
+            or non-terminal).
+
+        Args:
+            symbol: string
+            obs_embedding: tensor [obs_embedding_dim]
+            previous_sample_embedding: tensor [sample_embedding_dim]
+            inference_hidden: tensor [inference_hidden_dim]
+            obs: sentence (list of strings) or ys (torch.tensor of shape [100])
+
+        Returns:
+            tree: e.g.
+                ['S', ['NP', 'astronomers'],
+                      ['VP', ['V' 'saw'],
+                             ['NP' 'stars']]]
+                or 'stars'
+            tree_aux: e.g.
+                [[0.5], [[.9, 1., .2, .1, -.1, .1], None],
+                        [[-0.3 0.8], [[0.3], None]
+                                     [[.9, -.1, .2, .1, 1., .1], None]]]
+                or None
+            tree_aux_tilde: similar to tree_aux
+        """
+
+        if symbol is None:
+            symbol = self.grammar['start_symbol']
+
+        if obs_embedding is None:
+            obs_embedding = self.get_obs_embedding(obs)
+
+        if previous_sample_embedding is None:
+            previous_sample_embedding = torch.zeros(
+                (self.sample_embedding_dim,))
+
+        if inference_hidden is None:
+            inference_hidden = torch.zeros((self.inference_hidden_dim,))
+
+        if symbol in self.grammar['terminals']:
+            return symbol, None, None
+        elif depth > self.max_depth:
+            return symbol, None, None
+        else:
+            sample_address_embedding = util.get_sample_address_embedding(
+                symbol, self.grammar['non_terminals'])
+            inference_gru_output = self.get_inference_gru_output(
+                obs_embedding, previous_sample_embedding,
+                sample_address_embedding, inference_hidden)
+            logits = self.get_logits_from_inference_gru_output(
+                inference_gru_output, symbol)
+            oh_production_index, production_index_aux, \
+                production_index_aux_tilde = util.sample_relax(logits=logits)
+            production_index = torch.argmax(oh_production_index)
+            sample_embedding = self.get_sample_embedding(production_index)
+            production = self.grammar['productions'][symbol][production_index]
+
+            tree = [symbol]
+            tree_aux = [production_index_aux]
+            tree_aux_tilde = [production_index_aux_tilde]
+            for s in production:
+                subtree, subtree_aux, subtree_aux_tilde = \
+                    self.sample_tree_relax(
+                        s, obs_embedding, sample_embedding,
+                        inference_gru_output, depth=depth + 1)
+                tree.append(subtree)
+                tree_aux.append(subtree_aux)
+                tree_aux_tilde.append(subtree_aux_tilde)
+            return tree, tree_aux, tree_aux_tilde
+
+
+class ControlVariate(nn.Module):
+    def __init__(self, grammar, obs_embedding_dim=100,
+                 tree_obs_embedding_dim=100):
+        super(ControlVariate, self).__init__()
+        self.grammar = grammar
+        self.obs_embedding_dim = obs_embedding_dim
+        self.word_embedding_dim = len(self.grammar['terminals'])
+        self.tree_obs_embedding_dim = tree_obs_embedding_dim
+        self.obs_embedder_gru = nn.GRU(
+            input_size=self.word_embedding_dim,
+            hidden_size=self.obs_embedding_dim,
+            num_layers=1)
+        self.sample_address_embedding_dim = len(grammar['non_terminals'])
+        self.sample_embedding_dim = max(
+            [len(v) for _, v in grammar['productions'].items()])
+        self.tree_obs_embedder_gru = nn.GRUCell(
+            input_size=self.obs_embedding_dim + self.sample_embedding_dim +
+            self.sample_address_embedding_dim,
+            hidden_size=tree_obs_embedding_dim)
+        self.tree_obs_mlp = nn.Sequential(
+            nn.Linear(tree_obs_embedding_dim, 50),
+            nn.ReLU(),
+            nn.Linear(50, 25),
+            nn.ReLU(),
+            nn.Linear(25, 1))
+
+    def get_obs_embedding(self, obs):
+        """Args:
+            obs: list of strings
+
+        Returns: tensor of shape [obs_embedding_dim]
+        """
+
+        output, _ = self.obs_embedder_gru(util.sentence_to_one_hots(
+            obs, self.grammar['terminals']).unsqueeze(1))
+        return output[-1][0]
+
+    def get_tree_obs_gru_output(self, obs_embedding, sample_embedding,
+                                sample_address_embedding, tree_obs_hidden):
+        """Args:
+            obs_embedding: tensor [obs_embedding_dim]
+            sample_embedding: tensor [sample_embedding_dim]
+            sample_address_embedding: tensor [sample_embedding_address_dim]
+            tree_obs_hidden: tensor [tree_obs_embedding_dim]
+
+        Returns: tensor of shape [tree_obs_embedding_dim]
+        """
+        return self.tree_obs_embedder_gru(
+            torch.cat([obs_embedding,
+                       sample_embedding,
+                       sample_address_embedding]).unsqueeze(0),
+            tree_obs_hidden.unsqueeze(0)).squeeze(0)
+
+    def get_tree_obs_embedding(self, tree, tree_aux, obs_embedding):
+        """Args:
+            tree: e.g.
+                ['S', ['NP', 'astronomers'],
+                      ['VP', ['V' 'saw'],
+                             ['NP' 'stars']]]
+                or 'stars'
+            tree_aux: e.g.
+                [[0.5], [[.9, 1., .2, .1, -.1, .1], None],
+                        [[-0.3 0.8], [[0.3], None]
+                                     [[.9, -.1, .2, .1, 1., .1], None]]]
+                or None
+            obs_embedding: tensor of shape [obs_embedding_dim]
+
+        Returns: tensor of shape [tree_obs_embedding_dim]
+        """
+
+        if isinstance(tree, list):
+            non_terminal = tree[0]
+            sample_address_embedding = util.get_sample_address_embedding(
+                non_terminal, self.grammar['non_terminals'])
+            sample_embedding = util.pad_zeros(tree_aux[0],
+                                              self.sample_embedding_dim)
+            subtrees = tree[1:]
+            subtrees_aux = tree_aux[1:]
+            tree_obs_hidden = 0
+            for subtree, subtree_aux in zip(subtrees, subtrees_aux):
+                tree_obs_hidden += self.get_tree_obs_embedding(
+                    subtree, subtree_aux, obs_embedding)
+            return self.get_tree_obs_gru_output(
+                obs_embedding, sample_embedding, sample_address_embedding,
+                tree_obs_hidden)
+        else:
+            return torch.zeros((self.tree_obs_embedding_dim,))
+
+    def control_variate_single(self, tree, tree_aux, obs_embedding):
+        """Args:
+            tree: e.g.
+                ['S', ['NP', 'astronomers'],
+                      ['VP', ['V' 'saw'],
+                             ['NP' 'stars']]]
+                or 'stars'
+            tree_aux: e.g.
+                [[0.5], [[.9, 1., .2, .1, -.1, .1], None],
+                        [[-0.3 0.8], [[0.3], None]
+                                     [[.9, -.1, .2, .1, 1., .1], None]]]
+                or None
+            obs_embedding: tensor of shape [obs_embedding_dim]
+
+        Returns: scalar tensor
+        """
+        return self.tree_obs_mlp(self.get_tree_obs_embedding(
+            tree, tree_aux, obs_embedding).unsqueeze(0)).squeeze(0)
+
+    def forward(self, trees, trees_aux, obs_embeddings):
+        """Args:
+            trees_aux: list of lists of shape [num_obs, num_particles] where
+                each element is either a tree_aux or tree_aux_tilde
+            obs_embeddings: list of tensors of length num_obs where each tensor
+                is of shape [obs_embedding_dim]
+
+        Returns: tensor of shape [num_obs]
+        """
+
+        num_obs = len(obs_embeddings)
+        num_particles = len(trees_aux[0])
+        c = torch.zeros(num_obs, num_particles)
+        for obs_idx in range(num_obs):
+            for particle_idx in range(num_particles):
+                c[obs_idx, particle_idx] = self.control_variate_single(
+                    trees[obs_idx][particle_idx],
+                    trees_aux[obs_idx][particle_idx], obs_embeddings[obs_idx])
+        return torch.logsumexp(c, dim=1) - np.log(num_particles)

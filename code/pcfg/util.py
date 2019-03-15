@@ -626,12 +626,6 @@ def sample_relax(logits, epsilon=1e-6):
     Returns:
         latent, latent_aux, latent_aux_tilde: tensors of shape [num_categories]
     """
-    batch_size = len(obs)
-    num_mixtures = inference_network.num_mixtures
-    probs = inference_network.get_latent_params(obs)
-    probs_expanded = probs.unsqueeze(1).expand(
-        batch_size, num_particles, num_mixtures).contiguous().view(
-        batch_size * num_particles, num_mixtures)
     num_categories = len(logits)
     probs = exponentiate_and_normalize(logits)
 
@@ -642,7 +636,7 @@ def sample_relax(logits, epsilon=1e-6):
 
     # latent
     latent = torch.zeros(num_categories)
-    latent[torch.argmax(latent_aux, dim=1)] = 1
+    latent[torch.argmax(latent_aux)] = 1
     latent_byte = latent.byte()
 
     # latent_aux_tilde
@@ -654,3 +648,66 @@ def sample_relax(logits, epsilon=1e-6):
         -torch.log(v[1 - latent_byte]) / probs[1 - latent_byte] -
         torch.log(v[latent_byte]))
     return latent, latent_aux, latent_aux_tilde
+
+
+def pad_zeros(x, new_length):
+    """Args:
+
+        x: tensor of shape [length]
+        new_length: int which is >= length
+
+    Returns:
+        y: tensor of shape [new_length] where y[i] = x[i]
+            for i = {0, ..., length - 1} and y[i] = 0 otherwise
+    """
+
+    y = torch.zeros((new_length,), dtype=x.dtype, device=x.device,
+                    layout=x.layout)
+    y[:len(x)] = x
+    return y
+
+
+def save_control_variate(control_variate, model_folder='.', iteration=None):
+    if iteration is None:
+        suffix = ''
+    else:
+        suffix = iteration
+    path = os.path.join(model_folder, 'c{}.pt'.format(suffix))
+    if not os.path.exists(model_folder):
+        os.makedirs(model_folder)
+    torch.save(control_variate.state_dict(), path)
+    print_with_time('Saved to {}'.format(path))
+
+
+def load_control_variate(model_folder='.', iteration=None):
+    if iteration is None:
+        suffix = ''
+    else:
+        suffix = iteration
+    path = os.path.join(model_folder, 'c{}.pt'.format(suffix))
+    pcfg_path_path = os.path.join(model_folder, 'pcfg_path.txt')
+    with open(pcfg_path_path) as f:
+        pcfg_path = f.read()
+    grammar, _ = read_pcfg(pcfg_path)
+    control_variate = models.ControlVariate(grammar)
+    control_variate.load_state_dict(torch.load(path))
+    print_with_time('Loaded from {}'.format(path))
+
+
+def detach_tree_aux(tree_aux):
+    """Args:
+        tree_aux: e.g.
+            [[0.5], [[.9, 1., .2, .1, -.1, .1], None],
+                    [[-0.3 0.8], [[0.3], None]
+                                 [[.9, -.1, .2, .1, 1., .1], None]]]
+            or None
+
+    Returns: tree_aux detached
+    """
+
+    tree_aux_detached = []
+    if isinstance(tree_aux, list):
+        return [tree_aux[0].detach()] + [detach_tree_aux(subtree_aux)
+                                         for subtree_aux in tree_aux[1:]]
+    else:
+        return tree_aux

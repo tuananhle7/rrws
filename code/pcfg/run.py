@@ -1,5 +1,6 @@
 import util
 import train
+import models
 
 
 def load_or_init_models(load_model_folder, pcfg_path):
@@ -34,6 +35,8 @@ def run(args):
     util.set_seed(args.seed)
     generative_model, inference_network, true_generative_model = \
         load_or_init_models(args.load_model_folder, args.pcfg_path)
+    if args.train_mode == 'relax':
+        control_variate = models.ControlVariate(generative_model.grammar)
 
     # train
     if args.train_mode == 'ww':
@@ -63,6 +66,15 @@ def run(args):
                          true_generative_model, args.batch_size,
                          args.num_iterations, args.num_particles,
                          train_callback)
+    elif args.train_mode == 'relax':
+        train_callback = train.TrainRelaxCallback(
+            args.pcfg_path, model_folder, true_generative_model,
+            args.logging_interval, args.checkpoint_interval,
+            args.eval_interval)
+        train.train_relax(generative_model, inference_network, control_variate,
+                          true_generative_model, args.batch_size,
+                          args.num_iterations, args.num_particles,
+                          train_callback)
 
     # save models and stats
     util.save_models(generative_model, inference_network, args.pcfg_path,
@@ -78,8 +90,8 @@ if __name__ == '__main__':
     parser.add_argument('--load-model-folder', default='',
                         help='if specified, will train loaded model')
     parser.add_argument('--train-mode', default='ww',
-                        help='ww, ws, reinforce or vimco')
-    parser.add_argument('--num-iterations', type=int, default=2000,
+                        help='ww, ws, reinforce, vimco or relax')
+    parser.add_argument('--num-iterations', type=int, default=5000,
                         help=' ')
     parser.add_argument('--logging-interval', type=int, default=10,
                         help=' ')
@@ -87,14 +99,13 @@ if __name__ == '__main__':
                         help=' ')
     parser.add_argument('--checkpoint-interval', type=int, default=100,
                         help=' ')
-    parser.add_argument('--batch-size', type=int, default=5,
+    parser.add_argument('--batch-size', type=int, default=2,
                         help=' ')
     parser.add_argument('--num-particles', type=int, default=20,
                         help=' ')
     parser.add_argument('--seed', type=int, default=1, help=' ')
     parser.add_argument('--pcfg-path', default='./pcfgs/astronomers_pcfg.json',
                         help=' ')
-    parser.add_argument('--exp-levenshtein', dest='exp_levenshtein',
-                        action='store_true', default=False)
+    parser.add_argument('--version', default='with relax')
     args = parser.parse_args()
     run(args)

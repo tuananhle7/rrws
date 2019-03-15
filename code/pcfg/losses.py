@@ -130,8 +130,15 @@ def get_reinforce_loss(generative_model, inference_network, obss,
 
 def get_vimco_loss(generative_model, inference_network, obss,
                    num_particles=1):
-    """Returns:
+    """
+    Args:
+        generative_model: models.GenerativeModel object
+        inference_network: models.InferenceNetwork object
+        obss: list of obs each of which is either a sentence (list of strings)
+            or ys (tensor of shape [100])
+        num_particles: int
 
+    Returns:
         loss: scalar that we call .backward() on and step the optimizer.
         elbo: average elbo over data
     """
@@ -154,3 +161,52 @@ def get_vimco_loss(generative_model, inference_network, obss,
     elbo = torch.mean(log_evidence)
     loss = -elbo - torch.mean(reinforce_correction)
     return loss, elbo
+
+
+def get_relax_loss(generative_model, inference_network, control_variate, obss,
+                   num_particles=1):
+    """
+    Args:
+        generative_model: models.GenerativeModel object
+        inference_network: models.InferenceNetwork object
+        control_variate: models.ControlVariate object
+        obss: list of obs each of which is either a sentence (list of strings)
+            or ys (tensor of shape [100])
+        num_particles: int
+
+    Returns:
+        loss: scalar that we call .backward() on and step the optimizer.
+        elbo: average elbo over data
+    """
+    log_weight = torch.zeros(len(obss), num_particles)
+    log_q = torch.zeros(len(obss), num_particles)
+    trees = util.empty_list_of_size(len(obss), num_particles)
+    trees_aux = util.empty_list_of_size(len(obss), num_particles)
+    trees_aux_tilde = util.empty_list_of_size(len(obss), num_particles)
+    trees_aux_tilde_detached = util.empty_list_of_size(
+        len(obss), num_particles)
+    c_obs_embeddings = util.empty_list_of_size(len(obss))
+    for obs_idx, obs in enumerate(obss):
+        c_obs_embeddings[obs_idx] = control_variate.get_obs_embedding(obs)
+        for particle_idx in range(num_particles):
+            trees[obs_idx][particle_idx], trees_aux[obs_idx][particle_idx], \
+                trees_aux_tilde[obs_idx][particle_idx] = \
+                inference_network.sample_tree_relax(obs=obs)
+            trees_aux_tilde_detached[obs_idx][particle_idx] = \
+                util.detach_tree_aux(trees_aux_tilde[obs_idx][particle_idx])
+            log_q_ = inference_network.get_tree_log_prob(
+                trees[obs_idx][particle_idx], obs=obs)
+            log_p_ = generative_model.get_log_prob(
+                trees[obs_idx][particle_idx], obs)
+            log_weight[obs_idx, particle_idx] = log_p_ - log_q_
+            log_q[obs_idx, particle_idx] = log_q_
+    c = control_variate(trees, trees_aux, c_obs_embeddings)
+    c_tilde = control_variate(trees, trees_aux_tilde, c_obs_embeddings)
+    c_tilde_detached_tree = control_variate(trees, trees_aux_tilde_detached,
+                                            c_obs_embeddings)
+
+    log_evidence = torch.logsumexp(log_weight, dim=1) - np.log(num_particles)
+    return -torch.mean(
+        (log_evidence.detach() - c_tilde_detached_tree) *
+        torch.sum(log_q, dim=1) + c - c_tilde + log_evidence), \
+        torch.mean(log_evidence)
