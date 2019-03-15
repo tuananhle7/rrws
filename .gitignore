@@ -1,3 +1,4 @@
 *.DS_Store
 *.pt
-paper/uai2018
+*__pycache__/
+*.ipynb_checkpoints/
