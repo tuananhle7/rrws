@@ -5,7 +5,7 @@ def main():
     train_modes = ['ws', 'ww', 'dww', 'vimco', 'reinforce', 'concrete',
                    'relax']
     num_particles_list = [2, 5, 10, 20]
-    seeds = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
+    seeds = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
 
     for seed in seeds:
         for train_mode in train_modes:
