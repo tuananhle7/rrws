@@ -311,7 +311,8 @@ def plot_production_probs():
     ax.bar(np.arange(6) - width, true_production_probs['NP'].numpy(),
            width=width, color='black', label='True')
     for i, (train_mode, color) in enumerate(zip(['ws', 'vimco'],
-                                                ['#1f78b4', '#b2df8a'])):
+                                                ['C1', 'C5'])):
+                                                # ['#1f78b4', '#b2df8a'])):
         model_folder = util.get_most_recent_model_folder_args_match(
             num_iterations=num_iterations,
             logging_interval=logging_interval,
