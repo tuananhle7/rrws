@@ -8,7 +8,7 @@
 #SBATCH -o ./jobs_out_err/gmm_%j.out
 #SBATCH -e ./jobs_out_err/gmm_%j.err
 
-cd /data/engs-woodgroup/magd3733/rwspp/code/gmm
+cd /data/engs-woodgroup/magd3733/rwspp/gmm
 
 TRAIN_MODE=$1
 NUM_PARTICLES=$2

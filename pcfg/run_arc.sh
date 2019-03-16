@@ -8,7 +8,7 @@
 #SBATCH -o ./jobs_out_err/rws_pcfg_%j.out
 #SBATCH -e ./jobs_out_err/rws_pcfg_%j.err
 
-cd /data/engs-woodgroup/magd3733/rwspp/code/pcfg
+cd /data/engs-woodgroup/magd3733/rwspp/pcfg
 
 TRAIN_MODE=$1
 NUM_PARTICLES=$2
