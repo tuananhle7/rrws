@@ -6,7 +6,7 @@ import numpy as np
 
 
 class GenerativeModel(nn.Module):
-    def __init__(self, grammar, production_probs_init=None, max_depth=50):
+    def __init__(self, grammar, production_probs_init=None, max_depth=30):
         super(GenerativeModel, self).__init__()
         self.grammar = grammar
         if self.grammar['name'] == 'polynomial':
@@ -149,7 +149,7 @@ class GenerativeModel(nn.Module):
 
 class InferenceNetwork(nn.Module):
     def __init__(self, grammar, obs_embedding_dim=100,
-                 inference_hidden_dim=100, max_depth=50):
+                 inference_hidden_dim=100, max_depth=30):
         super(InferenceNetwork, self).__init__()
         self.grammar = grammar
         self.obs_embedding_dim = obs_embedding_dim
