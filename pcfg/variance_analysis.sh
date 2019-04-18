@@ -1,7 +1,7 @@
 #!/bin/bash
 
 #SBATCH --nodes=1
-#SBATCH --time=200:00:00
+#SBATCH --time=120:00:00
 #SBATCH --job-name=variance
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user=tuananh@robots.ox.ac.uk
