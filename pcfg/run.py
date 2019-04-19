@@ -91,7 +91,7 @@ if __name__ == '__main__':
                         help='if specified, will train loaded model')
     parser.add_argument('--train-mode', default='ww',
                         help='ww, ws, reinforce, vimco or relax')
-    parser.add_argument('--num-iterations', type=int, default=5000,
+    parser.add_argument('--num-iterations', type=int, default=2000,
                         help=' ')
     parser.add_argument('--logging-interval', type=int, default=10,
                         help=' ')
