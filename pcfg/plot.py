@@ -13,9 +13,10 @@ eval_interval = 10
 checkpoint_interval = 100
 batch_size = 2
 seed_list = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
-train_mode_list = ['reinforce', 'vimco', 'ws', 'ww']
+train_mode_list = ['relax', 'reinforce', 'vimco', 'ws', 'ww']
+colors = ['C3', 'C4', 'C5', 'C1', 'C6']
+linestyles = ['dashed', 'dashed', 'dashed', 'solid', 'solid']
 num_particles_list = [2, 5, 10, 20]
-exp_levenshtein = True
 pcfg_path = './pcfgs/astronomers_pcfg.json'
 
 
@@ -72,8 +73,7 @@ def load_errors():
                     batch_size=batch_size,
                     seed=seed,
                     train_mode=train_mode,
-                    num_particles=num_particles,
-                    exp_levenshtein=exp_levenshtein)
+                    num_particles=num_particles)
                 if len(model_folders) > 0:
                     model_folder = model_folders[np.argmax(
                         [os.stat(x).st_mtime for x in model_folders])]
@@ -99,9 +99,6 @@ def plot_errors():
     fig, axss = plt.subplots(nrows=2, ncols=len(num_particles_list),
                              figsize=(12, 4), sharex=True, sharey='row')
 
-    # colors = ['#a6cee3', '#1f78b4', '#b2df8a', '#33a02c']
-    colors = ['C4', 'C5', 'C1', 'C6']
-    linestyles = ['dashed', 'dashed', 'solid', 'solid']
     for train_mode_idx, train_mode in enumerate(train_mode_list):
         for num_particles_idx, num_particles in enumerate(num_particles_list):
             print('{} {}'.format(train_mode, num_particles))
@@ -233,8 +230,6 @@ def plot_both():
     fig, axss = plt.subplots(nrows=2, ncols=len(num_particles_list) + 1,
                              figsize=(12, 4), sharex='col', sharey='row')
 
-    # colors = ['#a6cee3', '#1f78b4', '#b2df8a', '#33a02c']
-    colors = ['C4', 'C5', 'C1', 'C6']
     for train_mode_idx, train_mode in enumerate(train_mode_list):
         for num_particles_idx, num_particles in enumerate(num_particles_list):
             print('{} {}'.format(train_mode, num_particles))
@@ -321,8 +316,7 @@ def plot_production_probs():
             batch_size=batch_size,
             seed=seed,
             train_mode=train_mode,
-            num_particles=num_particles,
-            exp_levenshtein=exp_levenshtein)
+            num_particles=num_particles)
         generative_model, _ = util.load_models(model_folder)
         production_probs = util.get_production_probs(generative_model)
         ax.bar(np.arange(6) + i * width, production_probs['NP'].numpy(),
@@ -365,8 +359,7 @@ def write_posteriors():
             batch_size=batch_size,
             seed=seed,
             train_mode=train_mode,
-            num_particles=num_particles,
-            exp_levenshtein=exp_levenshtein)
+            num_particles=num_particles)
         _, inference_network = util.load_models(model_folder)
         q_dist = util.get_inference_network_distribution(
             inference_network, sentence, num_samples=num_samples)
@@ -439,12 +432,12 @@ def plot_variance_analysis():
 
 
 def main():
-    # plot_errors()
+    plot_errors()
     # plot_errors_end_points()
     # plot_both()
     # plot_production_probs()
     # write_posteriors()
-    plot_variance_analysis()
+    # plot_variance_analysis()
 
 
 if __name__ == '__main__':
