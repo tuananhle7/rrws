@@ -6,6 +6,7 @@ import matplotlib.lines as mlines
 import torch
 import matplotlib.patches as mpatches
 from matplotlib.animation import FuncAnimation
+import seaborn as sns
 
 SMALL_SIZE = 5.5
 MEDIUM_SIZE = 9
@@ -442,10 +443,62 @@ def plot_model_movie():
     print('Saved to {}'.format(filename))
 
 
+def plot_variance_analysis():
+    num_particles_list = [2, 5, 10, 20, 50, 100]
+    [vimco_grad, vimco_one_grad, reinforce_grad, reinforce_one_grad,
+     two_grad, log_evidence_stats, log_evidence_grad, wake_phi_loss_grad,
+     log_Q_grad, sleep_loss_grad] = util.load_object(
+        './variance_analysis/data.pkl')
+
+    fig, axss = plt.subplots(2, 10, figsize=(20, 4), dpi=100, sharex=True,
+                             sharey='row')
+    for i, stats in enumerate(
+        [vimco_grad, vimco_one_grad, reinforce_grad, reinforce_one_grad,
+         two_grad, log_evidence_grad, wake_phi_loss_grad, log_Q_grad,
+         sleep_loss_grad, log_evidence_stats]):
+        for j in range(2):
+            axss[j, i].plot(stats[:, j], color='black')
+
+    axss[0, 0].set_ylabel('mean')
+    axss[1, 0].set_ylabel('std')
+
+    for ax in axss[0]:
+        ax.set_yticks([ax.get_yticks()[0], ax.get_yticks()[-1]])
+
+    for ax in axss[1]:
+        ax.set_yscale('log')
+        # ax.set_yticks([0, ax.get_yticks()[-1]])
+        # ax.set_yticks([ax.get_yticks()[0], ax.get_yticks()[-1]])
+        # ax.set_yticks([1e-2, 1e4])
+        ax.set_xlabel('K')
+
+    for axs in axss:
+        for ax in axs:
+            ax.set_xticks(range(len(num_particles_list)))
+            ax.set_xticklabels(num_particles_list)
+            sns.despine(ax=ax, trim=True)
+
+    for ax, title in zip(axss[0], [
+        r'$g_{VIMCO}$', r'$g_{VIMCO}^1$', r'$g_{REINFORCE}$',
+        r'$g_{REINFORCE}^1$', r'$g^2$', r'$\nabla_{\theta} \log Z_K$',
+        r'$\nabla_{\phi}$ wake-$\phi$ loss', r'$\nabla_{\phi} \log Q$',
+        r'$\nabla_{\phi}$ sleep loss', r'$\log \hat Z_K$'
+    ]):
+        ax.set_title(title)
+
+    fig.tight_layout()
+    if not os.path.exists('./plots/'):
+        os.makedirs('./plots/')
+    filename = './plots/variance_analysis.pdf'
+    fig.savefig(filename, bbox_inches='tight')
+    print('saved to {}'.format(filename))
+
+
 def main():
-    plot_errors()
-    plot_models()
-    plot_model_movie()
+    # plot_errors()
+    # plot_models()
+    # plot_model_movie()
+    plot_variance_analysis()
 
 
 if __name__ == '__main__':
