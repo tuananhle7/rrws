@@ -100,7 +100,7 @@ def run(args):
     util.save_models(generative_model, inference_network, model_folder)
     if args.train_mode == 'relax':
         util.save_control_variate(control_variate, model_folder)
-    stats_filename = util.get_stats_filename(model_folder)
+    stats_filename = util.get_stats_path(model_folder)
     util.save_object(train_callback, stats_filename)
 
 
