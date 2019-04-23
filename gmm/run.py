@@ -13,8 +13,11 @@ def run(args):
     else:
         args.device = torch.device('cpu')
     args.num_mixtures = 20
-    args.init_mixture_logits = np.array(list(reversed(
-        2 * np.arange(args.num_mixtures))))
+    if args.init_near:
+        args.init_mixture_logits = np.ones(args.num_mixtures)
+    else:
+        args.init_mixture_logits = np.array(list(reversed(
+            2 * np.arange(args.num_mixtures))))
     args.softmax_multiplier = 0.5
     if args.train_mode == 'concrete':
         args.relaxed_one_hot = True
@@ -123,6 +126,9 @@ if __name__ == '__main__':
                         help=' ')
     parser.add_argument('--num-particles', type=int, default=2,
                         help=' ')
+    parser.add_argument('--init-near', action='store_true',
+                        help='initialize model so that data distribution is '
+                             'close to the true data distribution')
     parser.add_argument('--seed', type=int, default=1, help=' ')
     parser.add_argument('--cuda', action='store_true', help='use cuda')
     args = parser.parse_args()
