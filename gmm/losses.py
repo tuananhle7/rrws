@@ -180,7 +180,7 @@ def get_vimco_loss(generative_model, inference_network, obs,
         control_variate = torch.logsumexp(
             torch.cat([log_weight_,
                        torch.mean(log_weight_, dim=1, keepdim=True)], dim=1),
-            dim=1)
+            dim=1) - np.log(num_particles)
         reinforce_correction = reinforce_correction + \
             (log_evidence.detach() - control_variate.detach()) * log_q[:, i]
 
