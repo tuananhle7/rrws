@@ -226,8 +226,8 @@ def get_relax_loss(generative_model, inference_network, control_variate,
         loss: scalar that we call .backward() on and step the optimizer.
         elbo: average elbo over data
     """
-    batch_size = len(obs)
-    num_mixtures = generative_model.num_mixtures
+    # batch_size = len(obs)
+    # num_mixtures = generative_model.num_mixtures
     latent, latent_aux, latent_aux_tilde = util.sample_relax(
         inference_network, control_variate, obs, num_particles)
     log_q = inference_network.get_log_prob(latent.transpose(0, 1), obs)\
