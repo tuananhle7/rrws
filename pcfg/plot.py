@@ -6,6 +6,11 @@ import os
 import matplotlib.lines as mlines
 import torch
 
+import matplotlib
+# # matplotlib.rcParams['pdf.fonttype'] = 42
+# # matplotlib.rcParams['ps.fonttype'] = 42
+matplotlib.rcParams['text.usetex'] = True
+
 
 num_iterations = 2000
 logging_interval = 10
@@ -13,9 +18,11 @@ eval_interval = 10
 checkpoint_interval = 100
 batch_size = 2
 seed_list = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
-train_mode_list = ['relax', 'reinforce', 'vimco', 'ws', 'ww']
-colors = ['C3', 'C4', 'C5', 'C1', 'C6']
-linestyles = ['dashed', 'dashed', 'dashed', 'solid', 'solid']
+# train_mode_list = ['relax', 'reinforce', 'vimco', 'ws', 'ww']
+# colors = ['C3', 'C4', 'C5', 'C1', 'C6']
+train_mode_list = ['reinforce', 'vimco', 'ws', 'ww']
+colors = ['C4', 'C5', 'C1', 'C6']
+linestyles = ['dashed', 'dashed', 'solid', 'solid']
 num_particles_list = [2, 5, 10, 20]
 pcfg_path = './pcfgs/astronomers_pcfg.json'
 

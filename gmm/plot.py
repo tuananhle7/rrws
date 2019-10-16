@@ -41,7 +41,8 @@ labels = ['Concrete', 'RELAX', 'REINFORCE', 'VIMCO', 'WS', 'WW',
 train_mode_list = ['concrete', 'relax', 'reinforce', 'vimco', 'ws', 'ww',
                    'dww']
 num_particles_list = [2, 5, 10, 20]
-seed_list = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+seed_list = [1, 2, 3, 4, 5, 6, 7, 8]
+init_near = True
 
 
 def delete_rows_with_nan(data):
@@ -85,10 +86,11 @@ def load_errors():
             for num_particles_idx, num_particles in enumerate(
                 num_particles_list
             ):
+                print('{} {} {}'.format(seed, train_mode, num_particles))
                 model_folder = util.get_most_recent_model_folder_args_match(
                     seed=seed,
                     train_mode=train_mode,
-                    num_particles=num_particles)
+                    num_particles=num_particles, init_near=init_near)
                 if model_folder is not None:
                     stats = util.load_object(
                         util.get_stats_path(model_folder))
@@ -171,6 +173,176 @@ def plot_errors():
     print('Saved to {}'.format(filename))
 
 
+def plot_errors_end_no_std():
+    p_error, q_error, _ = load_errors()
+    fig, axs = plt.subplots(1, 2)
+    fig.set_size_inches(5.5, 3)
+    for train_mode_idx, train_mode in enumerate(train_mode_list):
+        for num_particles_idx, num_particles in enumerate(num_particles_list):
+            print('{} {}'.format(train_mode, num_particles))
+            color = colors[train_mode_idx]
+            linestyle = linestyles[train_mode_idx]
+            plot_with_error_bars(
+                axss[0, num_particles_idx],
+                p_error[:, train_mode_idx, num_particles_idx, :],
+                color=color, linestyle=linestyle)
+            plot_with_error_bars(
+                axss[1, num_particles_idx],
+                q_error[:, train_mode_idx, num_particles_idx, :],
+                color=color, linestyle=linestyle)
+    axss[0, 0].set_yscale('log')
+    axss[0, 0].set_ylabel(
+        r'$\| p_{\theta}(z) - p_{\theta_{\text{true}}}(z) \|$')
+
+    axss[1, 0].set_yscale('log')
+    axss[1, 0].set_ylabel(
+        'Avg. test\n' +
+        r'$\| q_\phi(z | x) - p_{\theta_{\text{true}}}(z | x) \|$')
+
+    axss[2, 0].set_yscale('log')
+    axss[2, 0].set_ylabel('Std. of $\phi$ \n gradient est.')
+
+    handles = []
+    for train_mode_idx, train_mode in enumerate(train_mode_list):
+        handles.append(mlines.Line2D([0], [1], color=colors[train_mode_idx],
+                                     linestyle=linestyles[train_mode_idx]))
+    axss[-1, 1].legend(
+        handles, labels, bbox_to_anchor=(1, -0.2), loc='upper center',
+        ncol=len(train_mode_list))
+
+    for i, ax in enumerate(axss[0]):
+        ax.set_title('$K = {}$'.format(num_particles_list[i]))
+    for i, ax in enumerate(axss[-1]):
+        ax.set_xlabel('Iteration')
+        ax.xaxis.set_label_coords(0.5, -0.1)
+
+    for axs in axss:
+        for ax in axs:
+            ax.spines['top'].set_visible(False)
+            ax.spines['right'].set_visible(False)
+            ax.minorticks_off()
+            ax.set_xticks([0, 100])
+            ax.set_xticklabels([1, 100000])
+
+    fig.tight_layout(pad=0)
+    if not os.path.exists('./plots/'):
+        os.makedirs('./plots/')
+    filename = './plots/errors.pdf'
+    fig.savefig(filename, bbox_inches='tight')
+    print('Saved to {}'.format(filename))
+
+
+def plot_errors_no_std():
+    p_error, q_error, _ = load_errors()
+    fig, axss = plt.subplots(2, len(num_particles_list), sharex=True,
+                             sharey='row')
+    fig.set_size_inches(6, 2)
+    for train_mode_idx, train_mode in enumerate(train_mode_list):
+        for num_particles_idx, num_particles in enumerate(num_particles_list):
+            print('{} {}'.format(train_mode, num_particles))
+            color = colors[train_mode_idx]
+            linestyle = linestyles[train_mode_idx]
+            plot_with_error_bars(
+                axss[0, num_particles_idx],
+                p_error[:, train_mode_idx, num_particles_idx, :],
+                color=color, linestyle=linestyle)
+            plot_with_error_bars(
+                axss[1, num_particles_idx],
+                q_error[:, train_mode_idx, num_particles_idx, :],
+                color=color, linestyle=linestyle)
+            # plot_with_error_bars(
+            #     axss[2, num_particles_idx],
+            #     grad_std[:, train_mode_idx, num_particles_idx, :],
+            #     color=color, linestyle=linestyle)
+    axss[0, 0].set_yscale('log')
+    axss[0, 0].set_ylabel(
+        r'$\| p_{\theta}(z) - p_{\theta_{\text{true}}}(z) \|$')
+
+    axss[1, 0].set_yscale('log')
+    axss[1, 0].set_ylabel(
+        'Avg. test\n' +
+        r'$\| q_\phi(z | x) - p_{\theta_{\text{true}}}(z | x) \|$')
+
+    # axss[2, 0].set_yscale('log')
+    # axss[2, 0].set_ylabel('Std. of $\phi$ \n gradient est.')
+
+    handles = []
+    for train_mode_idx, train_mode in enumerate(train_mode_list):
+        handles.append(mlines.Line2D([0], [1], color=colors[train_mode_idx],
+                                     linestyle=linestyles[train_mode_idx]))
+    axss[-1, 1].legend(
+        handles, labels, bbox_to_anchor=(1, -0.15), loc='upper center',
+        ncol=len(train_mode_list))
+
+    for i, ax in enumerate(axss[0]):
+        ax.set_title('$K = {}$'.format(num_particles_list[i]))
+    for i, ax in enumerate(axss[-1]):
+        ax.set_xlabel('Iteration')
+        ax.xaxis.set_label_coords(0.5, -0.05)
+
+    for axs in axss:
+        for ax in axs:
+            ax.spines['top'].set_visible(False)
+            ax.spines['right'].set_visible(False)
+            ax.minorticks_off()
+            ax.set_xticks([0, 100])
+            ax.set_xticklabels([1, 100000])
+
+    fig.tight_layout(pad=0)
+    if not os.path.exists('./plots/'):
+        os.makedirs('./plots/')
+    filename = './plots/errors_no_std.pdf'
+    fig.savefig(filename, bbox_inches='tight')
+    print('Saved to {}'.format(filename))
+
+
+def plot_errors_just_std():
+    _, _, grad_std = load_errors()
+    fig, axss = plt.subplots(1, len(num_particles_list), sharex=True,
+                             sharey='row')
+    fig.set_size_inches(6, 1)
+    for train_mode_idx, train_mode in enumerate(train_mode_list):
+        for num_particles_idx, num_particles in enumerate(num_particles_list):
+            print('{} {}'.format(train_mode, num_particles))
+            color = colors[train_mode_idx]
+            linestyle = linestyles[train_mode_idx]
+            plot_with_error_bars(
+                axss[num_particles_idx],
+                grad_std[:, train_mode_idx, num_particles_idx, :],
+                color=color, linestyle=linestyle)
+
+    axss[0].set_yscale('log')
+    axss[0].set_ylabel('Std. of $\phi$ \n gradient est.')
+
+    handles = []
+    for train_mode_idx, train_mode in enumerate(train_mode_list):
+        handles.append(mlines.Line2D([0], [1], color=colors[train_mode_idx],
+                                     linestyle=linestyles[train_mode_idx]))
+    axss[1].legend(
+        handles, labels, bbox_to_anchor=(1, -0.2), loc='upper center',
+        ncol=len(train_mode_list))
+
+    for i, ax in enumerate(axss):
+        ax.set_title('$K = {}$'.format(num_particles_list[i]))
+    for i, ax in enumerate(axss):
+        ax.set_xlabel('Iteration')
+        ax.xaxis.set_label_coords(0.5, -0.1)
+
+    for ax in axss:
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+        ax.minorticks_off()
+        ax.set_xticks([0, 100])
+        ax.set_xticklabels([1, 100000])
+
+    fig.tight_layout(pad=0)
+    if not os.path.exists('./plots/'):
+        os.makedirs('./plots/')
+    filename = './plots/errors_just_std.pdf'
+    fig.savefig(filename, bbox_inches='tight')
+    print('Saved to {}'.format(filename))
+
+
 def plot_hinton(ax, data, top, bottom, left, right, pad=0, **kwargs):
     cell_width = (right - left) / len(data)
     cell_height = top - bottom
@@ -198,7 +370,7 @@ def plot_models():
     model_folder = util.get_most_recent_model_folder_args_match(
         seed=seed_list[0],
         train_mode=train_mode_list[0],
-        num_particles=num_particles_list[0])
+        num_particles=num_particles_list[0], init_near=init_near)
     args = util.load_object(util.get_args_path(model_folder))
     _, _, true_generative_model = util.init_models(args)
     test_xs = np.linspace(0, 19, num=num_test_x) * 10
@@ -235,7 +407,7 @@ def plot_models():
                 color = colors[train_mode_idx]
                 model_folder = util.get_most_recent_model_folder_args_match(
                     seed=seed, train_mode=train_mode,
-                    num_particles=num_particles)
+                    num_particles=num_particles, init_near=init_near)
                 if model_folder is not None:
                     generative_model, _ = util.load_models(
                         model_folder, iteration=iteration)
@@ -274,7 +446,7 @@ def plot_models():
                     model_folder = \
                         util.get_most_recent_model_folder_args_match(
                             seed=seed, train_mode=train_mode,
-                            num_particles=num_particles)
+                            num_particles=num_particles, init_near=init_near)
                     if model_folder is not None:
                         _, inference_network = util.load_models(
                             model_folder, iteration=iteration)
@@ -317,7 +489,7 @@ def plot_model_movie():
     model_folder = util.get_most_recent_model_folder_args_match(
         seed=seed_list[0],
         train_mode=train_mode_list[0],
-        num_particles=num_particles_list[0])
+        num_particles=num_particles_list[0], init_near=init_near)
     args = util.load_object(util.get_args_path(model_folder))
     _, _, true_generative_model = util.init_models(args)
     test_xs = np.linspace(0, 19, num=num_test_x) * 10
@@ -390,7 +562,7 @@ def plot_model_movie():
                 color = colors[train_mode_idx]
                 model_folder = util.get_most_recent_model_folder_args_match(
                     seed=seed, train_mode=train_mode,
-                    num_particles=num_particles)
+                    num_particles=num_particles, init_near=init_near)
                 if model_folder is not None:
                     generative_model, _ = util.load_models(
                         model_folder, iteration=iteration)
@@ -422,7 +594,7 @@ def plot_model_movie():
                     model_folder = \
                         util.get_most_recent_model_folder_args_match(
                             seed=seed, train_mode=train_mode,
-                            num_particles=num_particles)
+                            num_particles=num_particles, init_near=init_near)
                     if model_folder is not None:
                         _, inference_network = util.load_models(
                             model_folder, iteration=iteration)
@@ -495,10 +667,12 @@ def plot_variance_analysis():
 
 
 def main():
-    # plot_errors()
+    plot_errors()
+    # plot_errors_no_std()
+    # plot_errors_just_std()
     # plot_models()
     # plot_model_movie()
-    plot_variance_analysis()
+    # plot_variance_analysis()
 
 
 if __name__ == '__main__':

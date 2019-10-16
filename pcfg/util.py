@@ -418,7 +418,12 @@ def list_model_folders_args_match(rootdir='./models/', **kwargs):
 
     result = []
     for model_folder in list_subdirs(rootdir):
-        if args_match(model_folder, **kwargs):
+        # print(model_folder)
+        if model_folder == './models/__pycache__' or model_folder == './models/jobs_out_err' or model_folder == './models/models' or model_folder == './models/pcfgs' or model_folder == './models/variance_analysis':
+            continue
+        month = int(model_folder[13:15])
+        day = int(model_folder[15:17])
+        if day < 8 and month == 3 and args_match(model_folder, **kwargs):
             result.append(model_folder)
     return result
 
