@@ -187,6 +187,90 @@ def get_grads_weird_detach(seed):
     return theta_grads_in_one, phi_grads_in_one
 
 
+def get_grads_correct_sleep(seed):
+    util.set_seed(seed)
+
+    theta_grads_correct = []
+    phi_grads_correct = []
+
+    log_weight, log_q = losses.get_log_weight_and_log_q(
+        generative_model, inference_network, obs, num_particles)
+
+    optimizer_phi.zero_grad()
+    optimizer_theta.zero_grad()
+    wake_theta_loss, elbo = losses.get_wake_theta_loss_from_log_weight(
+        log_weight)
+    wake_theta_loss.backward(retain_graph=True)
+    theta_grads_correct = [parameter.grad.clone() for parameter in
+                           generative_model.parameters()]
+    # in rws, we step as we compute the grads
+    # optimizer_theta.step()
+
+    optimizer_phi.zero_grad()
+    optimizer_theta.zero_grad()
+    wake_phi_loss = losses.get_wake_phi_loss_from_log_weight_and_log_q(
+        log_weight, log_q)
+    wake_phi_loss.backward()
+    wake_phi_grads_correct = [parameter.grad.clone() for parameter in
+                              inference_network.parameters()]
+    # in rws, we step as we compute the grads
+    # optimizer_phi.step()
+
+    optimizer_phi.zero_grad()
+    optimizer_theta.zero_grad()
+    sleep_phi_loss = losses.get_sleep_loss(
+        generative_model, inference_network, num_samples=num_particles)
+    sleep_phi_loss.backward()
+    sleep_phi_grads_correct = [parameter.grad.clone() for parameter in
+                               inference_network.parameters()]
+
+    wake_factor = 0.7
+    phi_grads_correct = [wake_factor * wake_phi_grad_correct + (1 - wake_factor) * sleep_phi_grad_correct
+                         for wake_phi_grad_correct, sleep_phi_grad_correct in
+                         zip(wake_phi_grads_correct, sleep_phi_grads_correct)]
+
+    return theta_grads_correct, phi_grads_correct
+
+
+def get_grads_weird_detach_sleep(seed):
+    util.set_seed(seed)
+
+    theta_grads_in_one = []
+    phi_grads_in_one = []
+
+    log_weight, log_q = get_log_weight_and_log_q_weird_detach(
+        generative_model, inference_network, obs, num_particles)
+
+    optimizer_phi.zero_grad()
+    optimizer_theta.zero_grad()
+    wake_theta_loss, elbo = losses.get_wake_theta_loss_from_log_weight(
+        log_weight)
+    wake_theta_loss.backward(retain_graph=True)
+
+    # optimizer_phi.zero_grad() -> don't zero phi grads
+    # optimizer_theta.zero_grad()
+    wake_phi_loss = losses.get_wake_phi_loss_from_log_weight_and_log_q(
+        log_weight, log_q)
+
+    sleep_phi_loss = losses.get_sleep_loss(
+        generative_model, inference_network, num_samples=num_particles)
+
+    wake_factor = 0.7
+    phi_loss = wake_factor * wake_phi_loss + (1 - wake_factor) * sleep_phi_loss
+    phi_loss.backward()
+
+    # only get the grads in the end!
+    theta_grads_in_one = [parameter.grad.clone() for parameter in
+                          generative_model.parameters()]
+    phi_grads_in_one = [parameter.grad.clone() for parameter in
+                        inference_network.parameters()]
+
+    # in pyro, we want step to be in a different stage
+    # optimizer_theta.step()
+    # optimizer_phi.step()
+    return theta_grads_in_one, phi_grads_in_one
+
+
 def are_tensors_equal(xs, ys):
     return all([torch.all(torch.eq(x, y)) for x, y in zip(xs, ys)])
 
@@ -196,6 +280,8 @@ grads_correct = sum(get_grads_correct(seed), [])
 grads_in_one = sum(get_grads_in_one(seed), [])
 grads_in_one_no_zeroing = sum(get_grads_in_one_no_zeroing(seed), [])
 grads_weird_detach = sum(get_grads_weird_detach(seed), [])
+sleep_grads_correct = sum(get_grads_correct_sleep(seed), [])
+sleep_grads_weird_detach = sum(get_grads_weird_detach_sleep(seed), [])
 
 # is computing grads all in once ok?
 print('Computing grads all at once is ok: {}'.format(
@@ -204,3 +290,5 @@ print('Computing grads all at once and not zeroing phi grads is ok: {}'.format(
     are_tensors_equal(grads_correct, grads_in_one_no_zeroing)))
 print('Computing grads with weird detach is ok: {}'.format(
     are_tensors_equal(grads_correct, grads_weird_detach)))
+print('Computing sleep grads with weird detach is ok: {}'.format(
+    are_tensors_equal(sleep_grads_correct, sleep_grads_weird_detach)))
