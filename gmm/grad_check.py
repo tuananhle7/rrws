@@ -245,7 +245,6 @@ def get_grads_weird_detach_sleep(seed):
     optimizer_theta.zero_grad()
     wake_theta_loss, elbo = losses.get_wake_theta_loss_from_log_weight(
         log_weight)
-    wake_theta_loss.backward(retain_graph=True)
 
     # optimizer_phi.zero_grad() -> don't zero phi grads
     # optimizer_theta.zero_grad()
@@ -257,6 +256,8 @@ def get_grads_weird_detach_sleep(seed):
 
     wake_factor = 0.7
     phi_loss = wake_factor * wake_phi_loss + (1 - wake_factor) * sleep_phi_loss
+
+    wake_theta_loss.backward(retain_graph=True)
     phi_loss.backward()
 
     # only get the grads in the end!
