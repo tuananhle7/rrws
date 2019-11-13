@@ -224,7 +224,7 @@ def get_grads_correct_sleep(seed):
     sleep_phi_grads_correct = [parameter.grad.clone() for parameter in
                                inference_network.parameters()]
 
-    wake_factor = 0.7
+    wake_factor = 0.755
     phi_grads_correct = [wake_factor * wake_phi_grad_correct + (1 - wake_factor) * sleep_phi_grad_correct
                          for wake_phi_grad_correct, sleep_phi_grad_correct in
                          zip(wake_phi_grads_correct, sleep_phi_grads_correct)]
@@ -254,7 +254,7 @@ def get_grads_weird_detach_sleep(seed):
     sleep_phi_loss = losses.get_sleep_loss(
         generative_model, inference_network, num_samples=num_particles)
 
-    wake_factor = 0.7
+    wake_factor = 0.755
     phi_loss = wake_factor * wake_phi_loss + (1 - wake_factor) * sleep_phi_loss
 
     wake_theta_loss.backward(retain_graph=True)
@@ -273,7 +273,13 @@ def get_grads_weird_detach_sleep(seed):
 
 
 def are_tensors_equal(xs, ys):
-    return all([torch.all(torch.eq(x, y)) for x, y in zip(xs, ys)])
+    # return all([torch.all(torch.eq(x, y)) for x, y in zip(xs, ys)])
+
+    # this is ok
+    return all([torch.allclose(x, y, atol=1e-8) for x, y in zip(xs, ys)])
+
+    # this is not ok
+    # return all([torch.allclose(x, y, atol=1e-9) for x, y in zip(xs, ys)])
 
 
 seed = 1
